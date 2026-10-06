@@ -1,0 +1,6 @@
+{
+  "appId": "com.invictus.tracker",
+  "appName": "Invictus Track",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
