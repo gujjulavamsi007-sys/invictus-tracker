@@ -6,27 +6,27 @@ import {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
-  const [tripState, setTripState] = useState('idle'); // idle, tracking, saving
+  const [tripState, setTripState] = useState('idle'); 
   const [timer, setTimer] = useState(0);
-  const timerRef = useRef(null);
+  const timerRef = useRef<any>(null);
   
   // App Data State
-  const [officeLocation, setOfficeLocation] = useState(null);
-  const [savedDestinations, setSavedDestinations] = useState([]);
-  const [trips, setTrips] = useState([]);
-  const [managers, setManagers] = useState(['Ramu sir', 'KV Mam', 'Lakshmi Mam', 'swetha mam']);
+  const [officeLocation, setOfficeLocation] = useState<any>(null);
+  const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
+  const [trips, setTrips] = useState<any[]>([]);
+  const [managers, setManagers] = useState<string[]>([]);
 
   // Current Trip State
   const [currentTrip, setCurrentTrip] = useState({
-    startCoords: null,
-    endCoords: null,
-    startTime: null,
-    endTime: null,
+    startCoords: null as any,
+    endCoords: null as any,
+    startTime: null as number | null,
+    endTime: null as number | null,
     actualKm: 0,
     fromLoc: '',
     toLoc: '',
     visitor: '',
-    assignedBy: 'KV Mam',
+    assignedBy: '',
     parkingFees: 0,
     purpose: ''
   });
@@ -36,10 +36,12 @@ export default function App() {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
     const savedOffice = JSON.parse(localStorage.getItem('invictusOffice') || 'null');
     const savedDests = JSON.parse(localStorage.getItem('invictusDests') || '["Office", "Paradise", "Begumpet", "Malkajgiri"]');
+    const savedManagers = JSON.parse(localStorage.getItem('invictusManagers') || '["Ramu sir", "KV Mam", "Lakshmi Mam", "swetha mam"]');
     
     setTrips(savedTrips);
     setOfficeLocation(savedOffice);
     setSavedDestinations(savedDests);
+    setManagers(savedManagers);
   }, []);
 
   // Timer Effect
@@ -47,20 +49,22 @@ export default function App() {
     if (tripState === 'tracking') {
       timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
     } else {
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       if (tripState === 'idle') setTimer(0);
     }
-    return () => clearInterval(timerRef.current);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [tripState]);
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
   };
 
-  const getGPSLocation = () => {
+  const getGPSLocation = (): Promise<{lat: number, lon: number}> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation is not supported by your browser"));
@@ -74,9 +78,11 @@ export default function App() {
     });
   };
 
-  const getRoadDistanceOSRM = async (start, end) => {
+  const getRoadDistanceOSRM = async (start: any, end: any) => {
     try {
-      const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=false`);
+      const baseUrl = atob("aHR0cHM6Ly9yb3V0ZXIucHJvamVjdC1vc3JtLm9yZw==");
+      const path = "/route/v1/driving/";
+      const response = await fetch(`${baseUrl}${path}${start.lon},${start.lat};${end.lon},${end.lat}?overview=false`);
       const data = await response.json();
       if (data.routes && data.routes.length > 0) {
         const distanceMeters = data.routes[0].distance;
@@ -85,7 +91,7 @@ export default function App() {
       return 0.0;
     } catch (e) {
       console.error("OSRM Route Failed", e);
-      return 0.0; // Fallback so manual entry can be used
+      return 0.0; 
     }
   };
 
@@ -94,18 +100,25 @@ export default function App() {
       const coords = await getGPSLocation();
       const now = new Date();
       
-      // Auto-determine "From" location based on previous trip or office setting
       let autoFrom = "";
       const todayString = now.toLocaleDateString('en-GB');
       const todaysTrips = trips.filter(t => new Date(t.startTime).toLocaleDateString('en-GB') === todayString);
       
       if (todaysTrips.length > 0) {
-        autoFrom = todaysTrips[todaysTrips.length - 1].toLoc; // Last trip's destination
+        autoFrom = todaysTrips[todaysTrips.length - 1].toLoc;
       } else {
-        autoFrom = "Office"; // Default first trip to Office
+        autoFrom = "Office"; 
       }
 
-      setCurrentTrip({ ...currentTrip, startCoords: coords, startTime: now.getTime(), fromLoc: autoFrom });
+      const defaultManager = managers.length > 0 ? managers[0] : '';
+
+      setCurrentTrip({ 
+        ...currentTrip, 
+        startCoords: coords, 
+        startTime: now.getTime(), 
+        fromLoc: autoFrom,
+        assignedBy: defaultManager
+      });
       setTripState('tracking');
     } catch (err) {
       alert("GPS Error: Please ensure Location permissions are granted.");
@@ -149,7 +162,7 @@ export default function App() {
     }
   };
 
-  const saveDestination = (dest) => {
+  const saveDestination = (dest: string) => {
     if (dest && !savedDestinations.includes(dest)) {
       const updated = [...savedDestinations, dest];
       setSavedDestinations(updated);
@@ -157,26 +170,35 @@ export default function App() {
     }
   };
 
+  const saveManager = (managerName: string) => {
+    if (managerName && !managers.includes(managerName)) {
+      const updated = [...managers, managerName];
+      setManagers(updated);
+      localStorage.setItem('invictusManagers', JSON.stringify(updated));
+    }
+  };
+
   const finalizeTrip = () => {
-    if (!currentTrip.toLoc || !currentTrip.visitor) {
-      alert("Please enter Destination and Visitor Name");
+    if (!currentTrip.toLoc || !currentTrip.visitor || !currentTrip.assignedBy) {
+      alert("Please enter Destination, Visitor Name, and Assigned By");
       return;
     }
 
     saveDestination(currentTrip.toLoc);
+    saveManager(currentTrip.assignedBy);
 
     const tripRecord = {
       id: Date.now(),
-      date: new Date(currentTrip.startTime).toLocaleDateString('en-GB').replace(/\//g, '-'), // Format: DD-MM-YYYY
+      date: new Date(currentTrip.startTime!).toLocaleDateString('en-GB').replace(/\//g, '-'), 
       visitor: currentTrip.visitor,
       assignedBy: currentTrip.assignedBy,
       fromLoc: currentTrip.fromLoc,
       toLoc: currentTrip.toLoc,
-      totalKm: parseFloat(currentTrip.actualKm),
+      totalKm: parseFloat(currentTrip.actualKm.toString()),
       ratePerKm: 5,
-      petrolCharges: parseFloat(currentTrip.actualKm) * 5,
-      parkingFees: parseFloat(currentTrip.parkingFees) || 0,
-      totalAmount: (parseFloat(currentTrip.actualKm) * 5) + (parseFloat(currentTrip.parkingFees) || 0),
+      petrolCharges: parseFloat(currentTrip.actualKm.toString()) * 5,
+      parkingFees: parseFloat(currentTrip.parkingFees.toString()) || 0,
+      totalAmount: (parseFloat(currentTrip.actualKm.toString()) * 5) + (parseFloat(currentTrip.parkingFees.toString()) || 0),
       purpose: currentTrip.purpose,
       startTime: currentTrip.startTime,
       endTime: currentTrip.endTime
@@ -186,16 +208,15 @@ export default function App() {
     setTrips(newTrips);
     localStorage.setItem('invictusTrips', JSON.stringify(newTrips));
 
-    // Reset
     setCurrentTrip({
       startCoords: null, endCoords: null, startTime: null, endTime: null, actualKm: 0,
-      fromLoc: '', toLoc: '', visitor: '', assignedBy: 'KV Mam', parkingFees: 0, purpose: ''
+      fromLoc: '', toLoc: '', visitor: '', assignedBy: '', parkingFees: 0, purpose: ''
     });
     setTripState('idle');
     setActiveTab('reports');
   };
 
-  const deleteTrip = (id) => {
+  const deleteTrip = (id: number) => {
     if(window.confirm("Delete this trip?")) {
       const filtered = trips.filter(t => t.id !== id);
       setTrips(filtered);
@@ -203,7 +224,7 @@ export default function App() {
     }
   };
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     if (trips.length === 0) {
       alert("No trips to export");
       return;
@@ -215,7 +236,6 @@ export default function App() {
     ];
 
     let csvContent = headers.join(",") + "\n";
-    
     let totalKm = 0;
     let totalAmount = 0;
 
@@ -239,15 +259,37 @@ export default function App() {
       csvContent += row.join(",") + "\n";
     });
 
-    // Add totals row
     csvContent += `\n,,,,,TOTALS,${totalKm.toFixed(1)},,,,${totalAmount.toFixed(2)},\n`;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
     const monthStr = trips[0]?.date ? trips[0].date.substring(3) : "Report";
-    link.download = `Invictus_Tracker_${monthStr}.csv`;
-    link.click();
+    const fileName = `Invictus_Tracker_${monthStr}.csv`;
+
+    try {
+      const file = new File([csvContent], fileName, { type: 'text/csv' });
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Invictus Track Report',
+          text: 'Monthly travel tracking report attached.',
+        });
+        alert("Export successful! Report shared/saved.");
+        return;
+      }
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      alert("Export successful! File downloaded.");
+    } catch (err: any) {
+      alert("Export failed: " + (err.message || JSON.stringify(err)));
+    }
   };
 
   const groupTripsByDate = () => {
@@ -255,25 +297,27 @@ export default function App() {
       if (!acc[trip.date]) acc[trip.date] = [];
       acc[trip.date].push(trip);
       return acc;
-    }, {});
+    }, {} as Record<string, any[]>);
   };
 
+  const grandTotalTrips = trips.length;
+  const grandTotalKm = trips.reduce((sum, t) => sum + t.totalKm, 0);
+  const grandTotalAmount = trips.reduce((sum, t) => sum + t.totalAmount, 0);
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      {/* Header */}
-      <header className="bg-indigo-700 text-white p-4 shadow-md flex items-center justify-between z-10">
+    <div className="h-screen w-full bg-slate-100 flex flex-col font-sans overflow-hidden">
+      
+      <header className="bg-indigo-700 text-white p-4 shadow-md flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Navigation className="w-6 h-6" />
           <h1 className="text-xl font-bold">Invictus Track</h1>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto pb-20 p-4">
+      <main className="flex-1 overflow-y-auto p-4 pb-6">
         
-        {/* TRACKER TAB */}
         {activeTab === 'tracker' && (
-          <div className="flex flex-col h-full max-w-md mx-auto">
+          <div className="flex flex-col h-full max-w-md mx-auto pb-4">
             {tripState === 'idle' && (
               <div className="flex-1 flex flex-col items-center justify-center space-y-6 mt-10">
                 <div className="w-48 h-48 rounded-full bg-indigo-50 flex items-center justify-center border-4 border-indigo-100 shadow-inner">
@@ -346,20 +390,21 @@ export default function App() {
                       <label className="block text-xs font-semibold text-indigo-600 mb-1">Road Distance (KM)</label>
                       <input 
                         type="number" step="0.1" value={currentTrip.actualKm}
-                        onChange={(e) => setCurrentTrip({...currentTrip, actualKm: e.target.value})}
+                        onChange={(e) => setCurrentTrip({...currentTrip, actualKm: parseFloat(e.target.value) || 0})}
                         className="w-full border-2 border-indigo-200 bg-indigo-50 rounded-lg p-2 text-sm font-bold text-indigo-700 focus:outline-none"
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">Calculated via OSRM, edit if needed.</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Calculated via OSRM</p>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Assigned By</label>
-                      <select 
-                        value={currentTrip.assignedBy}
+                      <input 
+                        type="text" list="managersList" placeholder="Select or type..." value={currentTrip.assignedBy}
                         onChange={(e) => setCurrentTrip({...currentTrip, assignedBy: e.target.value})}
-                        className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"
-                      >
-                        {managers.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      />
+                      <datalist id="managersList">
+                        {managers.map(m => <option key={m} value={m} />)}
+                      </datalist>
                     </div>
                   </div>
 
@@ -385,7 +430,7 @@ export default function App() {
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Parking Fees (₹)</label>
                       <input 
                         type="number" placeholder="0" value={currentTrip.parkingFees}
-                        onChange={(e) => setCurrentTrip({...currentTrip, parkingFees: e.target.value})}
+                        onChange={(e) => setCurrentTrip({...currentTrip, parkingFees: parseFloat(e.target.value) || 0})}
                         className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"
                       />
                     </div>
@@ -403,17 +448,32 @@ export default function App() {
           </div>
         )}
 
-        {/* REPORTS TAB */}
         {activeTab === 'reports' && (
-          <div className="max-w-md mx-auto space-y-6">
+          <div className="max-w-md mx-auto space-y-6 pb-4">
+            
             <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Trip Reports</h2>
-                <p className="text-sm text-slate-500">{trips.length} total trips logged</p>
-              </div>
-              <button onClick={exportCSV} className="bg-emerald-100 text-emerald-700 p-3 rounded-lg flex items-center gap-2 hover:bg-emerald-200 transition font-semibold text-sm">
+              <h2 className="text-xl font-bold text-slate-800">Trip Reports</h2>
+              <button onClick={exportCSV} className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-emerald-200 transition font-bold text-sm shadow-sm">
                 <Download className="w-4 h-4" /> Export CSV
               </button>
+            </div>
+
+            <div className="bg-indigo-700 rounded-xl p-5 text-white shadow-md">
+              <h3 className="text-sm font-semibold text-indigo-200 mb-3 uppercase tracking-wider">Overall Summary</h3>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-indigo-800/50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold">{grandTotalTrips}</div>
+                  <div className="text-[10px] text-indigo-200 mt-1">TOTAL TRIPS</div>
+                </div>
+                <div className="bg-indigo-800/50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold">{grandTotalKm.toFixed(1)}</div>
+                  <div className="text-[10px] text-indigo-200 mt-1">TOTAL KM</div>
+                </div>
+                <div className="bg-indigo-800/50 p-3 rounded-lg">
+                  <div className="text-xl font-bold mt-1">₹{grandTotalAmount.toFixed(0)}</div>
+                  <div className="text-[10px] text-indigo-200 mt-1">GRAND TOTAL</div>
+                </div>
+              </div>
             </div>
 
             {trips.length === 0 ? (
@@ -442,12 +502,12 @@ export default function App() {
                           </div>
                           <div className="flex items-center text-xs text-slate-500 font-medium">
                             <span>{trip.fromLoc}</span>
-                            <RefreshCw className="w-3 h-3 mx-2 text-slate-300" />
+                            <RefreshCw className="w-3 h-3 mx-2 text-slate-300 shrink-0" />
                             <span>{trip.toLoc}</span>
                           </div>
                           <div className="flex justify-between items-end mt-1">
                             <span className="text-xs text-slate-400 italic">{trip.purpose || '-'}</span>
-                            <span className="text-xs font-bold text-slate-700">₹{trip.totalAmount}</span>
+                            <span className="text-xs font-bold text-slate-700">₹{trip.totalAmount.toFixed(2)}</span>
                           </div>
                         </div>
                       ))}
@@ -459,9 +519,8 @@ export default function App() {
           </div>
         )}
 
-        {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-md mx-auto space-y-4">
+          <div className="max-w-md mx-auto space-y-4 pb-4">
             <h2 className="text-xl font-bold text-slate-800 mb-6">Settings</h2>
             
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
@@ -496,8 +555,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="bg-white border-t border-slate-200 flex justify-around p-3 pb-safe z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <nav className="bg-white border-t border-slate-200 flex justify-around p-3 z-50 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full">
         <button 
           onClick={() => setActiveTab('tracker')}
           className={`flex flex-col items-center gap-1 ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-slate-400'}`}
