@@ -26,6 +26,7 @@ export default function App() {
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState('');
 
   const [currentTrip, setCurrentTrip] = useState({
     startCoords: null as any,
@@ -279,7 +280,32 @@ export default function App() {
     return `"${text.replace(/"/g, '""')}"`;
   };
 
-  const buildCSV = () => {
+
+  const getTripMonthKey = (trip: any) => {
+    if (trip.startTime) {
+      const d = new Date(trip.startTime);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    const parts = String(trip.date || '').split('-');
+    return parts.length === 3 ? `${parts[2]}-${parts[1]}` : '';
+  };
+
+  const getAvailableMonths = () =>
+    Array.from(new Set(trips.map(getTripMonthKey).filter(Boolean))).sort().reverse();
+
+  const getMonthLabel = (monthKey: string) => {
+    if (!monthKey) return 'All Months';
+    const [year, month] = monthKey.split('-').map(Number);
+    return new Date(year, month - 1, 1).toLocaleDateString('en-IN', {
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  const getFilteredTrips = () =>
+    selectedMonth ? trips.filter(t => getTripMonthKey(t) === selectedMonth) : trips;
+
+  const buildCSV = (reportTrips = getFilteredTrips()) => {
     const headers = [
       'Sn.',
       'DATE',
@@ -299,7 +325,7 @@ export default function App() {
     let totalKm = 0;
     let totalAmount = 0;
 
-    trips.forEach((t, i) => {
+    reportTrips.forEach((t, i) => {
       totalKm += Number(t.totalKm) || 0;
       totalAmount += Number(t.totalAmount) || 0;
 
@@ -332,11 +358,17 @@ export default function App() {
       return;
     }
 
-    const csvContent = buildCSV();
-    const monthStr = trips[0]?.date
-      ? trips[0].date.substring(3)
-      : 'Report';
-    const fileName = `Invictus_Tracker_${monthStr}.csv`;
+    const reportTrips = getFilteredTrips();
+
+    if (reportTrips.length === 0) {
+      alert('No trips found for the selected month');
+      return;
+    }
+
+    const csvContent = buildCSV(reportTrips);
+    const fileName = selectedMonth
+      ? `Petrol_Expenses_${selectedMonth}.csv`
+      : 'Petrol_Expenses_All_Months.csv';
 
     try {
       if (Capacitor.isNativePlatform()) {
@@ -661,15 +693,34 @@ export default function App() {
               </button>
             </div>
 
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Select Month
+              </label>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
+              >
+                <option value="">All Months</option>
+                {getAvailableMonths().map(month => (
+                  <option key={month} value={month}>{getMonthLabel(month)}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Reports and CSV export use the selected month.
+              </p>
+            </div>
+
             <div className="bg-gradient-to-r from-blue-700 via-teal-600 to-emerald-600 rounded-xl p-5 text-white shadow-md">
               <h3 className="text-sm font-semibold text-teal-50 mb-3 uppercase tracking-wider">
-                Overall Summary
+                {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
               </h3>
 
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="bg-white/10 p-3 rounded-lg">
                   <div className="text-2xl font-bold">
-                    {grandTotalTrips}
+                    {getFilteredTrips().length}
                   </div>
                   <div className="text-[10px] text-white/80 mt-1">
                     TOTAL TRIPS
@@ -678,7 +729,7 @@ export default function App() {
 
                 <div className="bg-white/10 p-3 rounded-lg">
                   <div className="text-2xl font-bold">
-                    {grandTotalKm.toFixed(1)}
+                    {getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalKm) || 0), 0).toFixed(1)}
                   </div>
                   <div className="text-[10px] text-white/80 mt-1">
                     TOTAL KM
@@ -687,7 +738,7 @@ export default function App() {
 
                 <div className="bg-white/10 p-3 rounded-lg">
                   <div className="text-xl font-bold mt-1">
-                    ₹{grandTotalAmount.toFixed(0)}
+                    ₹{getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalAmount) || 0), 0).toFixed(0)}
                   </div>
                   <div className="text-[10px] text-white/80 mt-1">
                     GRAND TOTAL
@@ -701,7 +752,13 @@ export default function App() {
                 No trips recorded yet.
               </div>
             ) : (
-              Object.entries(groupTripsByDate())
+              Object.entries(
+                getFilteredTrips().reduce((acc, trip) => {
+                  if (!acc[trip.date]) acc[trip.date] = [];
+                  acc[trip.date].push(trip);
+                  return acc;
+                }, {} as Record<string, any[]>)
+              )
                 .reverse()
                 .map(([date, dayTrips]) => {
                   const dayKm = dayTrips.reduce(
