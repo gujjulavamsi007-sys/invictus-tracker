@@ -612,7 +612,7 @@ export default function App() {
     const aDay = aDate ? getTripDateKey(aDate) : '';
     const bDay = bDate ? getTripDateKey(bDate) : '';
 
-    if (aDay !== bDay) return bDay.localeCompare(aDay);
+    if (aDay !== bDay) return aDay.localeCompare(bDay);
 
     const aStart = Number(a.startTime || a.id || 0) || 0;
     const bStart = Number(b.startTime || b.id || 0) || 0;
