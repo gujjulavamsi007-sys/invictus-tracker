@@ -4,6 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Invictus Track</title>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              teal: {
+                50: '#eef9fb',
+                100: '#d9f1f4',
+                200: '#b8e5e9',
+                300: '#81d1d4',
+                400: '#36b8b7',
+                500: '#119da8',
+                600: '#087f9b',
+                700: '#086f91',
+                800: '#075c7c',
+                900: '#124a61'
+              },
+              emerald: {
+                50: '#effaf0',
+                100: '#d9f3db',
+                200: '#b6e8b9',
+                300: '#83d98a',
+                400: '#52c95f',
+                500: '#31ae4d',
+                600: '#278e40',
+                700: '#227339',
+                800: '#1e5d32'
+              }
+            }
+          }
+        }
+      };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #f4f7f8; }
@@ -11,6 +44,10 @@
       .app-shell { height: 100vh; }
       .app-header { padding-top: env(safe-area-inset-top, 0px); }
       .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
+      .brand-gradient-bg { background: linear-gradient(128deg, #086bd6 0%, #087f9b 53%, #227339 100%); }
+      .brand-gradient-button { background: linear-gradient(110deg, #0874df 0%, #079ba7 56%, #279448 100%); }
+      .brand-gradient-button:hover { filter: brightness(0.96) saturate(1.08); }
+      .brand-gradient-button:focus-visible { outline: 3px solid rgba(8, 127, 155, 0.28); outline-offset: 2px; }
       @supports (height: 100dvh) { .app-shell { height: 100dvh; } }
     </style>
   </head>
@@ -19,4 +56,5 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
 
