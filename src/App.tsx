@@ -741,7 +741,6 @@ export default function App() {
         trip.date || '-',
         trip.visitor || '-',
         trip.assignedBy || '-',
-        getTripRecordedBy(trip) || '-',
         `${trip.fromLoc || '-'} → ${trip.toLoc || '-'}`,
         trip.purpose || '-',
         (Number(trip.totalKm) || 0).toFixed(1),
@@ -757,32 +756,8 @@ export default function App() {
       content: [
         { text: 'INVICTUS · FIELD TRACKER', style: 'eyebrow' },
         { text: 'Trip & Petrol Expense Report', style: 'title' },
+        ...(recordedByName ? [{ text: `Name: ${recordedByName}`, style: 'reporter' }] : []),
         { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}  ·  Generated ${generatedOn}`, style: 'subtitle' },
-        {
-          table: {
-            headerRows: 1,
-            widths: [22, 50, 74, 64, 56, '*', '*', 36, 56, 52, 58],
-            body: [[
-              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Recorded By', 'Route', 'Purpose',
-              'KM', 'Petrol', 'Parking', 'Total'
-            ], ...rows, [
-              { text: 'TOTALS', colSpan: 7, alignment: 'right', bold: true },
-              {}, {}, {}, {}, {}, {},
-              { text: totalKm.toFixed(1), bold: true },
-              { text: formatRupees(totalPetrol), bold: true },
-              { text: formatRupees(totalParking), bold: true },
-              { text: formatRupees(grandTotal), bold: true }
-            ]]
-          },
-          layout: {
-            hLineColor: () => '#dbe4e8',
-            vLineWidth: () => 0,
-            paddingLeft: () => 4,
-            paddingRight: () => 4,
-            paddingTop: () => 5,
-            paddingBottom: () => 5
-          }
-        },
         {
           margin: [0, 14, 0, 14],
           table: {
@@ -804,12 +779,38 @@ export default function App() {
             paddingTop: () => 9,
             paddingBottom: () => 9
           }
+        },
+        {
+          table: {
+            headerRows: 1,
+            widths: [22, 50, 74, 64, '*', '*', 36, 56, 52, 58],
+            body: [[
+              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Route', 'Purpose',
+              'KM', 'Petrol', 'Parking', 'Total'
+            ], ...rows, [
+              { text: 'TOTALS', colSpan: 6, alignment: 'right', bold: true },
+              {}, {}, {}, {}, {},
+              { text: totalKm.toFixed(1), bold: true },
+              { text: formatRupees(totalPetrol), bold: true },
+              { text: formatRupees(totalParking), bold: true },
+              { text: formatRupees(grandTotal), bold: true }
+            ]]
+          },
+          layout: {
+            hLineColor: () => '#dbe4e8',
+            vLineWidth: () => 0,
+            paddingLeft: () => 4,
+            paddingRight: () => 4,
+            paddingTop: () => 5,
+            paddingBottom: () => 5
+          }
         }
       ],
       styles: {
         eyebrow: { fontSize: 8, bold: true, color: '#0879d9', characterSpacing: 1.5 },
         title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
         subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
+        reporter: { fontSize: 9, bold: true, color: '#102a35', margin: [0, 5, 0, 0] },
         summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef9fb', alignment: 'center', lineHeight: 1.4 },
         summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#087f9b', alignment: 'center', lineHeight: 1.4 }
       },
