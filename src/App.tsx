@@ -290,6 +290,59 @@ export default function App() {
     return parts.length === 3 ? `${parts[2]}-${parts[1]}` : '';
   };
 
+  const getTripDate = (trip: any) => {
+    if (trip.startTime) {
+      const tripDate = new Date(trip.startTime);
+      return Number.isNaN(tripDate.getTime()) ? null : tripDate;
+    }
+
+    const parts = String(trip.date || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) {
+      return null;
+    }
+
+    const [day, month, year] = parts;
+    const tripDate = new Date(year, month - 1, day);
+    if (
+      tripDate.getFullYear() !== year ||
+      tripDate.getMonth() !== month - 1 ||
+      tripDate.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return tripDate;
+  };
+
+  const getTripDateKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+  const sumTripKm = (records: any[]) =>
+    records.reduce((sum, trip) => sum + (Number(trip.totalKm) || 0), 0);
+
+  const sumPetrolAmount = (records: any[]) =>
+    records.reduce((sum, trip) => {
+      const savedAmount = trip.petrolCharges ??
+        (Number(trip.totalKm) || 0) * Number(trip.ratePerKm ?? 5);
+      return sum + (Number(savedAmount) || 0);
+    }, 0);
+
+  const formatRupees = (amount: number) =>
+    `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+  const now = new Date();
+  const todayKey = getTripDateKey(now);
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const todayTrips = trips.filter(trip => {
+    const tripDate = getTripDate(trip);
+    return tripDate ? getTripDateKey(tripDate) === todayKey : false;
+  });
+  const monthTrips = trips.filter(trip => getTripMonthKey(trip) === currentMonthKey);
+  const todayKm = sumTripKm(todayTrips);
+  const todayPetrol = sumPetrolAmount(todayTrips);
+  const monthKm = sumTripKm(monthTrips);
+  const monthPetrol = sumPetrolAmount(monthTrips);
+
   const getAvailableMonths = () =>
     Array.from(new Set(trips.map(getTripMonthKey).filter(Boolean))).sort().reverse();
 
@@ -457,40 +510,92 @@ export default function App() {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
         {activeTab === 'tracker' && (
-          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center pb-5">
+          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 pb-5">
             {tripState === 'idle' && (
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-                <div className="mb-7 flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Trip tracking
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Ready
-                  </span>
-                </div>
-
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
-                  <Bike className="h-8 w-8" />
-                </div>
-
-                <div className="mb-7">
-                  <h2 className="text-2xl font-bold tracking-tight text-[#102a35] sm:text-[28px]">
-                    Ready for your next trip?
-                  </h2>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                    Start when you set off. Your trip time and route will be captured automatically.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleStartTrip}
-                  className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-teal-700 px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
+              <>
+                <section
+                  aria-labelledby="dashboard-title"
+                  className="rounded-[24px] bg-[#102a35] p-4 text-white shadow-lg shadow-slate-900/10 sm:p-5"
                 >
-                  <MapPin className="h-5 w-5" />
-                  Start trip
-                </button>
-              </div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-teal-200">
+                        At a glance
+                      </p>
+                      <h2 id="dashboard-title" className="mt-0.5 text-lg font-bold tracking-tight">
+                        Dashboard
+                      </h2>
+                    </div>
+                    <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-slate-200 ring-1 ring-white/10">
+                      {trips.length} {trips.length === 1 ? 'trip' : 'trips'} total
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        Today · KM
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">
+                        {todayKm.toFixed(1)} <span className="text-xs font-medium text-slate-300">km</span>
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        Today · Petrol
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">{formatRupees(todayPetrol)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        This month · KM
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">
+                        {monthKm.toFixed(1)} <span className="text-xs font-medium text-slate-300">km</span>
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                        This month · Petrol
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">{formatRupees(monthPetrol)}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+                  <div className="mb-7 flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Trip tracking
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Ready
+                    </span>
+                  </div>
+
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
+                    <Bike className="h-8 w-8" />
+                  </div>
+
+                  <div className="mb-7">
+                    <h2 className="text-2xl font-bold tracking-tight text-[#102a35] sm:text-[28px]">
+                      Ready for your next trip?
+                    </h2>
+                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                      Start when you set off. Your trip time and route will be captured automatically.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleStartTrip}
+                    className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-teal-700 px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
+                  >
+                    <MapPin className="h-5 w-5" />
+                    Start trip
+                  </button>
+                </div>
+              </>
             )}
 
             {tripState === 'tracking' && (
@@ -976,4 +1081,5 @@ export default function App() {
     </div>
   );
 }
+
 
