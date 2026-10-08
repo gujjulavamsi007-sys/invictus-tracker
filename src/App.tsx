@@ -514,6 +514,8 @@ export default function App() {
   const formatRupees = (amount: number) =>
     `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
+  const getTripRecordedBy = (trip: any) => trip.recordedBy || recordedByName;
+
   const now = new Date();
   const todayKey = getTripDateKey(now);
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -569,7 +571,7 @@ export default function App() {
         const searchFields = [
           trip.visitor,
           trip.assignedBy,
-          trip.recordedBy,
+          getTripRecordedBy(trip),
           trip.fromLoc,
           trip.toLoc,
           trip.purpose
@@ -624,7 +626,7 @@ export default function App() {
         t.date,
         t.visitor,
         t.assignedBy,
-        t.recordedBy,
+        getTripRecordedBy(t),
         t.fromLoc,
         t.toLoc,
         Number(t.totalKm || 0).toFixed(1),
@@ -739,7 +741,7 @@ export default function App() {
         trip.date || '-',
         trip.visitor || '-',
         trip.assignedBy || '-',
-        trip.recordedBy || '-',
+        getTripRecordedBy(trip) || '-',
         `${trip.fromLoc || '-'} → ${trip.toLoc || '-'}`,
         trip.purpose || '-',
         (Number(trip.totalKm) || 0).toFixed(1),
@@ -1686,9 +1688,9 @@ export default function App() {
                                   <span className="truncate">{trip.toLoc}</span>
                                 </div>
 
-                                {trip.recordedBy && (
+                                {getTripRecordedBy(trip) && (
                                   <p className="text-xs font-medium text-slate-500">
-                                    Recorded by <span className="font-semibold text-teal-800">{trip.recordedBy}</span>
+                                    Recorded by <span className="font-semibold text-teal-800">{getTripRecordedBy(trip)}</span>
                                   </p>
                                 )}
 
