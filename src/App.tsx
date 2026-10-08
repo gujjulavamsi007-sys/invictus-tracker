@@ -435,83 +435,118 @@ export default function App() {
   );
 
   const inputClass =
-    'w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none';
+    'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
 
   return (
-    <div className="h-screen w-full bg-slate-100 flex flex-col font-sans overflow-hidden">
-      <header className="bg-gradient-to-r from-blue-700 via-teal-600 to-emerald-600 text-white p-4 shadow-md flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Navigation className="w-6 h-6" />
-          <h1 className="text-xl font-bold">Petrol Expenses Tracker</h1>
+    <div className="app-shell flex w-full flex-col overflow-hidden bg-[#f4f7f8] font-sans text-slate-900">
+      <header className="app-header z-10 shrink-0 bg-[#102a35] text-white shadow-sm">
+        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+            <Navigation className="h-5 w-5 text-teal-300" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300">
+              INVICTUS · FIELD TRACKER
+            </p>
+            <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+              Petrol Expenses
+            </h1>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-6">
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
         {activeTab === 'tracker' && (
-          <div className="flex flex-col h-full max-w-md mx-auto pb-4">
+          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center pb-5">
             {tripState === 'idle' && (
-              <div className="flex-1 flex flex-col items-center justify-center space-y-6 mt-10">
-                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-50 via-teal-50 to-emerald-50 flex items-center justify-center border-4 border-teal-100 shadow-inner">
-                  <Bike className="w-20 h-20 text-teal-600" />
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+                <div className="mb-7 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Trip tracking
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Ready
+                  </span>
                 </div>
 
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold text-slate-800">
-                    Ready to go?
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
+                  <Bike className="h-8 w-8" />
+                </div>
+
+                <div className="mb-7">
+                  <h2 className="text-2xl font-bold tracking-tight text-[#102a35] sm:text-[28px]">
+                    Ready for your next trip?
                   </h2>
-                  <p className="text-slate-500 mt-2 text-sm px-4">
-                    Press Start Trip to capture your current location and begin routing.
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                    Start when you set off. Your trip time and route will be captured automatically.
                   </p>
                 </div>
 
                 <button
                   onClick={handleStartTrip}
-                  className="w-full py-4 bg-gradient-to-r from-blue-700 via-teal-600 to-emerald-600 hover:from-blue-800 hover:via-teal-700 hover:to-emerald-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-teal-200 transition active:scale-95 flex items-center justify-center gap-2"
+                  className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-teal-700 px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
                 >
-                  <MapPin className="w-5 h-5" />
-                  START TRIP
+                  <MapPin className="h-5 w-5" />
+                  Start trip
                 </button>
               </div>
             )}
 
             {tripState === 'tracking' && (
-              <div className="flex-1 flex flex-col items-center space-y-8 mt-10">
-                <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 animate-pulse" />
-                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Trip in Progress
-                  </h3>
-
-                  <div className="text-5xl font-mono text-teal-700 font-light mb-4 tracking-tighter">
-                    {formatTime(timer)}
+              <div className="space-y-4">
+                <div className="relative overflow-hidden rounded-[28px] bg-[#102a35] p-6 text-white shadow-lg shadow-slate-900/10 sm:p-7">
+                  <div className="absolute right-0 top-0 h-40 w-40 translate-x-12 -translate-y-16 rounded-full bg-teal-400/10 blur-2xl" />
+                  <div className="relative flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                      Trip in progress
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-teal-200 ring-1 ring-white/10">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-teal-300" />
+                      Live
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-center gap-2 text-sm text-slate-500 bg-slate-50 py-2 rounded-lg">
-                    <Navigation className="w-4 h-4 text-teal-600 animate-pulse" />
-                    GPS Tracking Active
+                  <div className="relative py-9 text-center">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                      Elapsed time
+                    </p>
+                    <div className="whitespace-nowrap text-5xl font-medium tabular-nums tracking-tight text-white sm:text-6xl">
+                      {formatTime(timer)}
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center justify-center gap-2 rounded-xl bg-white/[0.08] px-4 py-3 text-sm font-medium text-slate-200 ring-1 ring-white/10">
+                    <Navigation className="h-4 w-4 text-teal-300" />
+                    GPS tracking active
                   </div>
                 </div>
 
                 <button
                   onClick={handleEndTrip}
-                  className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-red-200 transition active:scale-95 flex items-center justify-center gap-2"
+                  className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-rose-600 px-5 py-4 text-base font-bold text-white shadow-lg shadow-rose-900/15 transition hover:bg-rose-700 focus:outline-none focus:ring-4 focus:ring-rose-600/20 active:scale-[0.99]"
                 >
-                  <AlertCircle className="w-5 h-5" />
-                  END TRIP
+                  <AlertCircle className="h-5 w-5" />
+                  End trip
                 </button>
               </div>
             )}
 
             {tripState === 'saving' && (
-              <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-200 animate-fade-in">
-                <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">
-                  Review & Save Trip
-                </h2>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-6 border-b border-slate-100 pb-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+                    Trip details
+                  </p>
+                  <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
+                    Review & save trip
+                  </h2>
+                </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         From Location
                       </label>
                       <input
@@ -528,7 +563,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         To (Destination)
                       </label>
                       <input
@@ -552,9 +587,9 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold text-teal-700 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-teal-800">
                         Road Distance (KM)
                       </label>
                       <input
@@ -567,7 +602,7 @@ export default function App() {
                             actualKm: parseFloat(e.target.value) || 0
                           })
                         }
-                        className="w-full border-2 border-teal-200 bg-teal-50 rounded-lg p-2 text-sm font-bold text-teal-700 focus:outline-none"
+                        className="w-full rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-3 text-base font-bold text-teal-800 shadow-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
                       />
                       <p className="text-[10px] text-slate-400 mt-1">
                         Calculated via OSRM
@@ -575,7 +610,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         Assigned By
                       </label>
                       <input
@@ -600,7 +635,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Visitor / Client Name
                     </label>
                     <input
@@ -617,9 +652,9 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         Purpose / Remarks
                       </label>
                       <input
@@ -637,7 +672,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         Parking Fees (₹)
                       </label>
                       <input
@@ -655,17 +690,17 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="pt-4 flex gap-3">
+                  <div className="flex gap-3 border-t border-slate-100 pt-5">
                     <button
                       onClick={() => setTripState('idle')}
-                      className="flex-1 py-3 text-slate-600 bg-slate-100 rounded-lg font-semibold text-sm"
+                      className="min-h-12 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                     >
                       Cancel
                     </button>
 
                     <button
                       onClick={finalizeTrip}
-                      className="flex-[2] py-3 text-white bg-gradient-to-r from-blue-700 via-teal-600 to-emerald-600 hover:from-blue-800 hover:via-teal-700 hover:to-emerald-700 rounded-lg font-bold text-sm shadow-md flex items-center justify-center gap-2"
+                      className="flex min-h-12 flex-[2] items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
                     >
                       <Save className="w-4 h-4" />
                       Save Record
@@ -678,69 +713,74 @@ export default function App() {
         )}
 
         {activeTab === 'reports' && (
-          <div className="max-w-md mx-auto space-y-6 pb-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="text-xl font-bold text-slate-800">
-                Trip Reports
-              </h2>
+          <div className="mx-auto max-w-md space-y-4 pb-5">
+            <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+                  History & totals
+                </p>
+                <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
+                  Trip reports
+                </h2>
+              </div>
 
               <button
                 onClick={exportCSV}
-                className="bg-teal-100 text-teal-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-teal-200 transition font-bold text-sm shadow-sm"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
               >
-                <Download className="w-4 h-4" />
+                <Download className="h-4 w-4" />
                 Export CSV
               </button>
             </div>
 
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 Select Month
               </label>
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold text-slate-700 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
               >
                 <option value="">All Months</option>
                 {getAvailableMonths().map(month => (
                   <option key={month} value={month}>{getMonthLabel(month)}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-slate-400 mt-2">
+              <p className="mt-2 text-xs leading-5 text-slate-400">
                 Reports and CSV export use the selected month.
               </p>
             </div>
 
-            <div className="bg-gradient-to-r from-blue-700 via-teal-600 to-emerald-600 rounded-xl p-5 text-white shadow-md">
-              <h3 className="text-sm font-semibold text-teal-50 mb-3 uppercase tracking-wider">
+            <div className="rounded-2xl bg-[#102a35] p-5 text-white shadow-lg shadow-slate-900/10">
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">
                 {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
               </h3>
 
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-white/10 p-3 rounded-lg">
-                  <div className="text-2xl font-bold">
+              <div className="grid grid-cols-3 gap-2 text-center sm:gap-3">
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="text-2xl font-bold tabular-nums">
                     {getFilteredTrips().length}
                   </div>
-                  <div className="text-[10px] text-white/80 mt-1">
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
                     TOTAL TRIPS
                   </div>
                 </div>
 
-                <div className="bg-white/10 p-3 rounded-lg">
-                  <div className="text-2xl font-bold">
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="text-2xl font-bold tabular-nums">
                     {getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalKm) || 0), 0).toFixed(1)}
                   </div>
-                  <div className="text-[10px] text-white/80 mt-1">
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
                     TOTAL KM
                   </div>
                 </div>
 
-                <div className="bg-white/10 p-3 rounded-lg">
-                  <div className="text-xl font-bold mt-1">
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
                     ₹{getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalAmount) || 0), 0).toFixed(0)}
                   </div>
-                  <div className="text-[10px] text-white/80 mt-1">
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
                     GRAND TOTAL
                   </div>
                 </div>
@@ -748,7 +788,7 @@ export default function App() {
             </div>
 
             {trips.length === 0 ? (
-              <div className="text-center py-10 text-slate-400">
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
                 No trips recorded yet.
               </div>
             ) : (
@@ -773,18 +813,18 @@ export default function App() {
                   return (
                     <div
                       key={date}
-                      className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                     >
-                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-700">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                        <h3 className="text-sm font-bold text-slate-700">
                           {date}
                         </h3>
 
-                        <div className="text-right">
-                          <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-1 rounded mr-2">
+                        <div className="flex items-center gap-1.5 text-right">
+                          <span className="rounded-lg bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-800 sm:text-xs">
                             {dayKm.toFixed(1)} KM
                           </span>
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+                          <span className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 sm:text-xs">
                             ₹{dayAmount.toFixed(2)}
                           </span>
                         </div>
@@ -794,7 +834,7 @@ export default function App() {
                         {dayTrips.map(trip => (
                           <div
                             key={trip.id}
-                            className="p-4 flex flex-col gap-2 relative group"
+                            className="relative flex flex-col gap-2 p-4 group"
                           >
                             <button
                               onClick={() => deleteTrip(trip.id)}
@@ -804,25 +844,25 @@ export default function App() {
                             </button>
 
                             <div className="flex justify-between items-start">
-                              <span className="font-bold text-slate-800 text-sm">
+                              <span className="min-w-0 pr-14 text-sm font-bold text-slate-800">
                                 {trip.visitor}
                                 <span className="text-slate-400 font-normal ml-1">
                                   ({trip.assignedBy})
                                 </span>
                               </span>
 
-                              <span className="text-sm font-semibold text-teal-700">
+                              <span className="shrink-0 text-sm font-semibold text-teal-800">
                                 {trip.totalKm} km
                               </span>
                             </div>
 
-                            <div className="flex items-center text-xs text-slate-500 font-medium">
+                            <div className="flex min-w-0 items-center text-xs font-medium text-slate-500">
                               <span>{trip.fromLoc}</span>
                               <RefreshCw className="w-3 h-3 mx-2 text-slate-300 shrink-0" />
                               <span>{trip.toLoc}</span>
                             </div>
 
-                            <div className="flex justify-between items-end mt-1">
+                            <div className="mt-1 flex items-end justify-between gap-3">
                               <span className="text-xs text-slate-400 italic">
                                 {trip.purpose || '-'}
                               </span>
@@ -841,24 +881,29 @@ export default function App() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-md mx-auto space-y-4 pb-4">
-            <h2 className="text-xl font-bold text-slate-800 mb-6">
-              Settings
-            </h2>
+          <div className="mx-auto max-w-md space-y-4 pb-5">
+            <div className="mb-5">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+                Preferences
+              </p>
+              <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
+                Settings
+              </h2>
+            </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-teal-600" />
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
+                <MapPin className="h-4 w-4 text-teal-700" />
                 Office Location Setting
               </h3>
 
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="mb-4 text-sm leading-6 text-slate-500">
                 Set your current physical location as 'Office'. The app uses
                 this to auto-fill your first trip of the day.
               </p>
 
               {officeLocation && (
-                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg text-xs font-mono mb-4 border border-emerald-100">
+                <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-mono text-emerald-800">
                   Saved: {officeLocation.lat.toFixed(5)},{' '}
                   {officeLocation.lon.toFixed(5)}
                 </div>
@@ -866,18 +911,18 @@ export default function App() {
 
               <button
                 onClick={saveOfficeGPS}
-                className="w-full py-3 bg-gradient-to-r from-blue-50 to-emerald-50 hover:from-blue-100 hover:to-emerald-100 text-teal-700 font-semibold rounded-lg text-sm border border-teal-200 transition"
+                className="flex min-h-12 w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/10"
               >
                 Capture Current GPS as Office
               </button>
             </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-slate-700 mb-4 text-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-[#102a35]">
                 App Info
               </h3>
 
-              <ul className="text-xs text-slate-500 space-y-2">
+              <ul className="space-y-3 text-sm text-slate-500">
                 <li>• App: Petrol Expenses Tracker</li>
                 <li>• Routing Provider: OSRM Public API</li>
                 <li>• Rate / KM: Fixed at ₹5.00</li>
@@ -889,43 +934,46 @@ export default function App() {
         )}
       </main>
 
-      <nav className="bg-white border-t border-slate-200 flex justify-around p-3 z-50 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full">
+      <nav className="pb-safe z-20 shrink-0 border-t border-slate-200 bg-white/95 px-4 pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+        <div className="mx-auto grid w-full max-w-md grid-cols-3 gap-2">
         <button
           onClick={() => setActiveTab('tracker')}
-          className={`flex flex-col items-center gap-1 ${
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-3 transition ${
             activeTab === 'tracker'
-              ? 'text-teal-600'
-              : 'text-slate-400'
+              ? 'bg-teal-50 text-teal-800'
+              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
           }`}
         >
-          <Navigation className="w-6 h-6" />
-          <span className="text-[10px] font-semibold">Track</span>
+          <Navigation className="h-5 w-5" />
+          <span className="text-[11px] font-semibold">Track</span>
         </button>
 
         <button
           onClick={() => setActiveTab('reports')}
-          className={`flex flex-col items-center gap-1 ${
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-3 transition ${
             activeTab === 'reports'
-              ? 'text-teal-600'
-              : 'text-slate-400'
+              ? 'bg-teal-50 text-teal-800'
+              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
           }`}
         >
-          <History className="w-6 h-6" />
-          <span className="text-[10px] font-semibold">Reports</span>
+          <History className="h-5 w-5" />
+          <span className="text-[11px] font-semibold">Reports</span>
         </button>
 
         <button
           onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center gap-1 ${
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-3 transition ${
             activeTab === 'settings'
-              ? 'text-teal-600'
-              : 'text-slate-400'
+              ? 'bg-teal-50 text-teal-800'
+              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
           }`}
         >
-          <Settings className="w-6 h-6" />
-          <span className="text-[10px] font-semibold">Settings</span>
+          <Settings className="h-5 w-5" />
+          <span className="text-[11px] font-semibold">Settings</span>
         </button>
+        </div>
       </nav>
     </div>
   );
 }
+
