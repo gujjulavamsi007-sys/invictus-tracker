@@ -759,28 +759,6 @@ export default function App() {
         { text: 'Trip & Petrol Expense Report', style: 'title' },
         { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}  ·  Generated ${generatedOn}`, style: 'subtitle' },
         {
-          margin: [0, 14, 0, 14],
-          table: {
-            widths: ['*', '*', '*', '*', '*'],
-            body: [[
-              { text: `TRIPS\n${selectedTrips.length}`, style: 'summary' },
-              { text: `TOTAL KM\n${totalKm.toFixed(1)}`, style: 'summary' },
-              { text: `PETROL\n${formatRupees(totalPetrol)}`, style: 'summary' },
-              { text: `PARKING\n${formatRupees(totalParking)}`, style: 'summary' },
-              { text: `GRAND TOTAL\n${formatRupees(grandTotal)}`, style: 'summaryHighlight' }
-            ]]
-          },
-          layout: {
-            hLineWidth: () => 0,
-            vLineWidth: () => 5,
-            vLineColor: () => '#ffffff',
-            paddingLeft: () => 8,
-            paddingRight: () => 8,
-            paddingTop: () => 9,
-            paddingBottom: () => 9
-          }
-        },
-        {
           table: {
             headerRows: 1,
             widths: [22, 50, 74, 64, 56, '*', '*', 36, 56, 52, 58],
@@ -803,6 +781,28 @@ export default function App() {
             paddingRight: () => 4,
             paddingTop: () => 5,
             paddingBottom: () => 5
+          }
+        },
+        {
+          margin: [0, 14, 0, 14],
+          table: {
+            widths: ['*', '*', '*', '*', '*'],
+            body: [[
+              { text: `TRIPS\n${selectedTrips.length}`, style: 'summary' },
+              { text: `TOTAL KM\n${totalKm.toFixed(1)}`, style: 'summary' },
+              { text: `PETROL\n${formatRupees(totalPetrol)}`, style: 'summary' },
+              { text: `PARKING\n${formatRupees(totalParking)}`, style: 'summary' },
+              { text: `GRAND TOTAL\n${formatRupees(grandTotal)}`, style: 'summaryHighlight' }
+            ]]
+          },
+          layout: {
+            hLineWidth: () => 0,
+            vLineWidth: () => 5,
+            vLineColor: () => '#ffffff',
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 9,
+            paddingBottom: () => 9
           }
         }
       ],
