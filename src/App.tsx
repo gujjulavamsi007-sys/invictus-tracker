@@ -30,6 +30,8 @@ export default function App() {
   const [officeLocation, setOfficeLocation] = useState<any>(null);
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
+  const [recordedByName, setRecordedByName] = useState('');
+  const [recordedByInput, setRecordedByInput] = useState('');
   const [assignedPeople, setAssignedPeople] = useState<string[]>([]);
   const [savedVisitors, setSavedVisitors] = useState<string[]>([]);
   const [visitorInput, setVisitorInput] = useState('');
@@ -54,12 +56,14 @@ export default function App() {
     toLoc: '',
     visitor: '',
     assignedBy: '',
+    recordedBy: '',
     parkingFees: 0,
     purpose: ''
   });
 
   useEffect(() => {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
+    const savedRecordedByName = localStorage.getItem('invictusRecordedBy') || '';
     const savedOffice = JSON.parse(localStorage.getItem('invictusOffice') || 'null');
     const savedDests = JSON.parse(
       localStorage.getItem('invictusDests') ||
@@ -73,6 +77,8 @@ export default function App() {
     const savedRate = Number(localStorage.getItem('invictusRate') ?? 5);
 
     setTrips(savedTrips);
+    setRecordedByName(savedRecordedByName);
+    setRecordedByInput(savedRecordedByName);
     setOfficeLocation(savedOffice);
     setSavedDestinations(savedDests);
     setAssignedPeople(savedAssignedPeople);
@@ -147,6 +153,12 @@ export default function App() {
   };
 
   const handleStartTrip = async () => {
+    if (!recordedByName.trim()) {
+      alert('Please set the name for this phone in Settings before starting a trip.');
+      setActiveTab('settings');
+      return;
+    }
+
     try {
       const coords = await getGPSLocation();
       const now = new Date();
@@ -168,7 +180,8 @@ export default function App() {
         startCoords: coords,
         startTime: now.getTime(),
         fromLoc: autoFrom,
-        assignedBy: defaultAssignedPerson
+        assignedBy: defaultAssignedPerson,
+        recordedBy: recordedByName
       }));
 
       setTripState('tracking');
@@ -269,6 +282,19 @@ export default function App() {
     alert('Petrol rate saved. Existing trips keep their saved rate.');
   };
 
+  const saveRecordedByName = () => {
+    const normalizedName = recordedByInput.trim();
+    if (!normalizedName) {
+      alert('Enter the name of the person using this phone.');
+      return;
+    }
+
+    setRecordedByName(normalizedName);
+    setRecordedByInput(normalizedName);
+    localStorage.setItem('invictusRecordedBy', normalizedName);
+    alert('Name saved on this phone. New trips will include it.');
+  };
+
   const finalizeTrip = () => {
     if (!currentTrip.toLoc || !currentTrip.visitor || !currentTrip.assignedBy) {
       alert('Please enter Destination, Visitor Name, and Assigned Person');
@@ -286,6 +312,7 @@ export default function App() {
       date: new Date(currentTrip.startTime!).toLocaleDateString('en-GB').replace(/\//g, '-'),
       visitor: currentTrip.visitor,
       assignedBy: currentTrip.assignedBy,
+      recordedBy: currentTrip.recordedBy || recordedByName,
       fromLoc: currentTrip.fromLoc,
       toLoc: currentTrip.toLoc,
       totalKm: km,
@@ -313,6 +340,7 @@ export default function App() {
       toLoc: '',
       visitor: '',
       assignedBy: '',
+      recordedBy: '',
       parkingFees: 0,
       purpose: ''
     });
@@ -541,6 +569,7 @@ export default function App() {
         const searchFields = [
           trip.visitor,
           trip.assignedBy,
+          trip.recordedBy,
           trip.fromLoc,
           trip.toLoc,
           trip.purpose
@@ -567,6 +596,7 @@ export default function App() {
       'Date',
       'Visitor / Client',
       'Assigned Person',
+      'Recorded By',
       'From',
       'To',
       'Distance (km)',
@@ -594,6 +624,7 @@ export default function App() {
         t.date,
         t.visitor,
         t.assignedBy,
+        t.recordedBy,
         t.fromLoc,
         t.toLoc,
         Number(t.totalKm || 0).toFixed(1),
@@ -607,7 +638,7 @@ export default function App() {
       csvContent += row.map(csvEscape).join(',') + '\n';
     });
 
-    csvContent += `,,,,,TOTALS,${totalKm.toFixed(1)},,${totalPetrol.toFixed(2)},${totalParking.toFixed(2)},${grandTotal.toFixed(2)},\n`;
+    csvContent += `,,,,,,TOTALS,${totalKm.toFixed(1)},,${totalPetrol.toFixed(2)},${totalParking.toFixed(2)},${grandTotal.toFixed(2)},\n`;
 
     return csvContent;
   };
@@ -708,6 +739,7 @@ export default function App() {
         trip.date || '-',
         trip.visitor || '-',
         trip.assignedBy || '-',
+        trip.recordedBy || '-',
         `${trip.fromLoc || '-'} → ${trip.toLoc || '-'}`,
         trip.purpose || '-',
         (Number(trip.totalKm) || 0).toFixed(1),
@@ -749,13 +781,13 @@ export default function App() {
         {
           table: {
             headerRows: 1,
-            widths: [22, 50, 78, 68, '*', '*', 36, 56, 52, 58],
+            widths: [22, 50, 74, 64, 56, '*', '*', 36, 56, 52, 58],
             body: [[
-              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Route', 'Purpose',
+              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Recorded By', 'Route', 'Purpose',
               'KM', 'Petrol', 'Parking', 'Total'
             ], ...rows, [
-              { text: 'TOTALS', colSpan: 6, alignment: 'right', bold: true },
-              {}, {}, {}, {}, {},
+              { text: 'TOTALS', colSpan: 7, alignment: 'right', bold: true },
+              {}, {}, {}, {}, {}, {},
               { text: totalKm.toFixed(1), bold: true },
               { text: formatRupees(totalPetrol), bold: true },
               { text: formatRupees(totalParking), bold: true },
@@ -905,7 +937,7 @@ export default function App() {
         trip && typeof trip === 'object' &&
         (typeof trip.id === 'number' || typeof trip.id === 'string') &&
         typeof trip.date === 'string' &&
-        ['visitor', 'assignedBy', 'fromLoc', 'toLoc', 'purpose'].every((field: string) =>
+        ['visitor', 'assignedBy', 'recordedBy', 'fromLoc', 'toLoc', 'purpose'].every((field: string) =>
           trip[field] === undefined || trip[field] === null || typeof trip[field] === 'string'
         ) &&
         ['totalKm', 'ratePerKm', 'petrolCharges', 'parkingFees', 'totalAmount', 'startTime', 'endTime'].every((field: string) =>
@@ -1082,6 +1114,11 @@ export default function App() {
                     </h2>
                     <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
                       Start when you set off. Your trip time and route will be captured automatically.
+                    </p>
+                    <p className="mt-2 text-xs font-medium text-slate-500">
+                      {recordedByName
+                        ? `New trips will be recorded as ${recordedByName}.`
+                        : 'Set this phone’s name in Settings before starting a trip.'}
                     </p>
                   </div>
 
@@ -1649,6 +1686,12 @@ export default function App() {
                                   <span className="truncate">{trip.toLoc}</span>
                                 </div>
 
+                                {trip.recordedBy && (
+                                  <p className="text-xs font-medium text-slate-500">
+                                    Recorded by <span className="font-semibold text-teal-800">{trip.recordedBy}</span>
+                                  </p>
+                                )}
+
                                 <div className="flex items-end justify-between gap-3">
                                   <span className="text-xs italic text-slate-400">{trip.purpose || '-'}</span>
                                   <span className="shrink-0 text-xs font-bold text-slate-700">
@@ -1693,6 +1736,35 @@ export default function App() {
               <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
                 Settings
               </h2>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
+                <UserRound className="h-4 w-4 text-teal-700" />
+                Name on this phone
+              </h3>
+              <p className="mb-4 text-sm leading-6 text-slate-500">
+                New trips saved on this phone will show who recorded them. This name is stored only on this phone.
+              </p>
+              <label className="mb-3 block text-xs font-semibold text-slate-600">
+                Recorded by
+                <input
+                  type="text"
+                  value={recordedByInput}
+                  onChange={event => setRecordedByInput(event.target.value)}
+                  placeholder="Enter the phone user's name"
+                  className={inputClass + ' mt-1.5'}
+                  maxLength={80}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={saveRecordedByName}
+                className="brand-gradient-button flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <Save className="h-4 w-4" />
+                {recordedByName ? 'Update phone name' : 'Save phone name'}
+              </button>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
