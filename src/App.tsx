@@ -492,6 +492,19 @@ export default function App() {
   const getTripDateKey = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+  const compareTripsByReportOrder = (a: any, b: any) => {
+    const aDate = getTripDate(a);
+    const bDate = getTripDate(b);
+    const aDay = aDate ? getTripDateKey(aDate) : '';
+    const bDay = bDate ? getTripDateKey(bDate) : '';
+
+    if (aDay !== bDay) return bDay.localeCompare(aDay);
+
+    const aStart = Number(a.startTime || a.id || 0) || 0;
+    const bStart = Number(b.startTime || b.id || 0) || 0;
+    return aStart - bStart;
+  };
+
   const sumTripKm = (records: any[]) =>
     records.reduce((sum, trip) => sum + (Number(trip.totalKm) || 0), 0);
 
@@ -578,11 +591,7 @@ export default function App() {
         ].join(' ').toLocaleLowerCase();
         return searchFields.includes(search);
       })
-      .sort((a, b) => {
-        const aTime = getTripDate(a)?.getTime() || 0;
-        const bTime = getTripDate(b)?.getTime() || 0;
-        return bTime - aTime || Number(b.id || 0) - Number(a.id || 0);
-      });
+      .sort(compareTripsByReportOrder);
   };
 
   const clearHistoryFilters = () => {
@@ -735,7 +744,7 @@ export default function App() {
       : `Invictus_Trip_Report_All_Months_${exportDate}.pdf`;
     const rows = selectedTrips
       .slice()
-      .sort((a, b) => (getTripDate(b)?.getTime() || 0) - (getTripDate(a)?.getTime() || 0))
+      .sort(compareTripsByReportOrder)
       .map((trip, index) => [
         String(index + 1),
         trip.date || '-',
@@ -753,11 +762,16 @@ export default function App() {
       pageSize: 'A4',
       pageOrientation: 'landscape',
       pageMargins: [28, 38, 28, 38],
+      footer: {
+        text: `Generated ${generatedOn}`,
+        alignment: 'left',
+        margin: [28, 0, 0, 16],
+        style: 'footer'
+      },
       content: [
-        { text: 'INVICTUS · FIELD TRACKER', style: 'eyebrow' },
-        { text: 'Trip & Petrol Expense Report', style: 'title' },
+        { text: 'Petrol Expense Report', style: 'title' },
         ...(recordedByName ? [{ text: `Name: ${recordedByName}`, style: 'reporter' }] : []),
-        { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}  ·  Generated ${generatedOn}`, style: 'subtitle' },
+        { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}`, style: 'subtitle' },
         {
           margin: [0, 14, 0, 14],
           table: {
@@ -765,8 +779,8 @@ export default function App() {
             body: [[
               { text: `TRIPS\n${selectedTrips.length}`, style: 'summary' },
               { text: `TOTAL KM\n${totalKm.toFixed(1)}`, style: 'summary' },
-              { text: `PETROL\n${formatRupees(totalPetrol)}`, style: 'summary' },
-              { text: `PARKING\n${formatRupees(totalParking)}`, style: 'summary' },
+              { text: `PETROL AMOUNT\n${formatRupees(totalPetrol)}`, style: 'summary' },
+              { text: `PARKING FEE\n${formatRupees(totalParking)}`, style: 'summary' },
               { text: `GRAND TOTAL\n${formatRupees(grandTotal)}`, style: 'summaryHighlight' }
             ]]
           },
@@ -786,9 +800,9 @@ export default function App() {
             widths: [22, 50, 74, 64, '*', '*', 36, 56, 52, 58],
             body: [[
               'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Route', 'Purpose',
-              'KM', 'Petrol', 'Parking', 'Total'
+              'KM', 'Petrol Amount', 'Parking Fee', 'Total'
             ], ...rows, [
-              { text: 'TOTALS', colSpan: 6, alignment: 'right', bold: true },
+              { text: 'TOTAL', colSpan: 6, alignment: 'right', bold: true },
               {}, {}, {}, {}, {},
               { text: totalKm.toFixed(1), bold: true },
               { text: formatRupees(totalPetrol), bold: true },
@@ -807,10 +821,10 @@ export default function App() {
         }
       ],
       styles: {
-        eyebrow: { fontSize: 8, bold: true, color: '#0879d9', characterSpacing: 1.5 },
         title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
         subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
-        reporter: { fontSize: 9, bold: true, color: '#102a35', margin: [0, 5, 0, 0] },
+        footer: { fontSize: 8, color: '#64748b' },
+        reporter: { fontSize: 12, bold: true, color: '#087f9b', margin: [0, 6, 0, 0] },
         summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef9fb', alignment: 'center', lineHeight: 1.4 },
         summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#087f9b', alignment: 'center', lineHeight: 1.4 }
       },
