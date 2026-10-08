@@ -30,9 +30,8 @@ export default function App() {
   const [officeLocation, setOfficeLocation] = useState<any>(null);
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
-  const [managers, setManagers] = useState<string[]>([]);
+  const [assignedPeople, setAssignedPeople] = useState<string[]>([]);
   const [savedVisitors, setSavedVisitors] = useState<string[]>([]);
-  const [managerInput, setManagerInput] = useState('');
   const [visitorInput, setVisitorInput] = useState('');
   const [petrolRate, setPetrolRate] = useState(5);
   const [rateInput, setRateInput] = useState('5');
@@ -66,7 +65,7 @@ export default function App() {
       localStorage.getItem('invictusDests') ||
       '["Office", "Paradise", "Begumpet", "Malkajgiri"]'
     );
-    const savedManagers = JSON.parse(
+    const savedAssignedPeople = JSON.parse(
       localStorage.getItem('invictusManagers') ||
       '["Ramu sir", "KV Mam", "Lakshmi Mam", "swetha mam"]'
     );
@@ -76,7 +75,7 @@ export default function App() {
     setTrips(savedTrips);
     setOfficeLocation(savedOffice);
     setSavedDestinations(savedDests);
-    setManagers(savedManagers);
+    setAssignedPeople(savedAssignedPeople);
     setSavedVisitors(savedVisitors);
     setPetrolRate(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5);
     setRateInput(String(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5));
@@ -162,14 +161,14 @@ export default function App() {
           ? todaysTrips[todaysTrips.length - 1].toLoc
           : 'Office';
 
-      const defaultManager = managers.length > 0 ? managers[0] : '';
+      const defaultAssignedPerson = assignedPeople.length > 0 ? assignedPeople[0] : '';
 
       setCurrentTrip(prev => ({
         ...prev,
         startCoords: coords,
         startTime: now.getTime(),
         fromLoc: autoFrom,
-        assignedBy: defaultManager
+        assignedBy: defaultAssignedPerson
       }));
 
       setTripState('tracking');
@@ -230,11 +229,11 @@ export default function App() {
     }
   };
 
-  const saveManager = (managerName: string) => {
-    const normalizedName = managerName.trim();
-    if (normalizedName && !managers.some(name => name.toLowerCase() === normalizedName.toLowerCase())) {
-      const updated = [...managers, normalizedName];
-      setManagers(updated);
+  const saveAssignedPerson = (personName: string) => {
+    const normalizedName = personName.trim();
+    if (normalizedName && !assignedPeople.some(name => name.toLowerCase() === normalizedName.toLowerCase())) {
+      const updated = [...assignedPeople, normalizedName];
+      setAssignedPeople(updated);
       localStorage.setItem('invictusManagers', JSON.stringify(updated));
     }
   };
@@ -248,14 +247,7 @@ export default function App() {
     }
   };
 
-  const removeSavedName = (kind: 'manager' | 'visitor', name: string) => {
-    if (kind === 'manager') {
-      const updated = managers.filter(item => item !== name);
-      setManagers(updated);
-      localStorage.setItem('invictusManagers', JSON.stringify(updated));
-      return;
-    }
-
+  const removeSavedVisitor = (name: string) => {
     const updated = savedVisitors.filter(item => item !== name);
     setSavedVisitors(updated);
     localStorage.setItem('invictusVisitors', JSON.stringify(updated));
@@ -279,12 +271,12 @@ export default function App() {
 
   const finalizeTrip = () => {
     if (!currentTrip.toLoc || !currentTrip.visitor || !currentTrip.assignedBy) {
-      alert('Please enter Destination, Visitor Name, and Assigned By');
+      alert('Please enter Destination, Visitor Name, and Assigned Person');
       return;
     }
 
     saveDestination(currentTrip.toLoc);
-    saveManager(currentTrip.assignedBy);
+    saveAssignedPerson(currentTrip.assignedBy);
 
     const km = parseFloat(currentTrip.actualKm.toString()) || 0;
     const parking = parseFloat(currentTrip.parkingFees.toString()) || 0;
@@ -364,7 +356,7 @@ export default function App() {
   const saveEditedTrip = (tripId: number) => {
     if (!editingTripForm?.date || !editingTripForm.visitor.trim() ||
         !editingTripForm.assignedBy.trim() || !editingTripForm.toLoc.trim()) {
-      alert('Enter the date, destination, visitor, and assigned manager.');
+      alert('Enter the date, destination, visitor, and assigned person.');
       return;
     }
 
@@ -423,7 +415,7 @@ export default function App() {
     });
 
     saveVisitor(editingTripForm.visitor);
-    saveManager(editingTripForm.assignedBy);
+    saveAssignedPerson(editingTripForm.assignedBy);
     saveDestination(editingTripForm.toLoc);
     setTrips(updatedTrips);
     localStorage.setItem('invictusTrips', JSON.stringify(updatedTrips));
@@ -574,7 +566,7 @@ export default function App() {
       'No.',
       'Date',
       'Visitor / Client',
-      'Assigned Manager',
+      'Assigned Person',
       'From',
       'To',
       'Distance (km)',
@@ -759,7 +751,7 @@ export default function App() {
             headerRows: 1,
             widths: [22, 50, 78, 68, '*', '*', 36, 56, 52, 58],
             body: [[
-              'No.', 'Date', 'Visitor / Client', 'Manager', 'Route', 'Purpose',
+              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Route', 'Purpose',
               'KM', 'Petrol', 'Parking', 'Total'
             ], ...rows, [
               { text: 'TOTALS', colSpan: 6, alignment: 'right', bold: true },
@@ -781,11 +773,11 @@ export default function App() {
         }
       ],
       styles: {
-        eyebrow: { fontSize: 8, bold: true, color: '#0f766e', characterSpacing: 1.5 },
+        eyebrow: { fontSize: 8, bold: true, color: '#0879d9', characterSpacing: 1.5 },
         title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
         subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
-        summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef7f6', alignment: 'center', lineHeight: 1.4 },
-        summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#0f766e', alignment: 'center', lineHeight: 1.4 }
+        summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef9fb', alignment: 'center', lineHeight: 1.4 },
+        summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#087f9b', alignment: 'center', lineHeight: 1.4 }
       },
       defaultStyle: { font: 'Roboto', fontSize: 7, color: '#334155' }
     };
@@ -833,7 +825,7 @@ export default function App() {
         trips,
         officeLocation,
         savedDestinations,
-        managers,
+        managers: assignedPeople,
         savedVisitors,
         petrolRate
       }
@@ -959,7 +951,7 @@ export default function App() {
       setTrips(data.trips);
       setOfficeLocation(data.officeLocation);
       setSavedDestinations(data.savedDestinations);
-      setManagers(data.managers);
+      setAssignedPeople(data.managers);
       setSavedVisitors(data.savedVisitors);
       setPetrolRate(validRate);
       setRateInput(String(validRate));
@@ -998,7 +990,7 @@ export default function App() {
 
   return (
     <div className="app-shell flex w-full flex-col overflow-hidden bg-[#f4f7f8] font-sans text-slate-900">
-      <header className="app-header z-10 shrink-0 bg-[#102a35] text-white shadow-sm">
+      <header className="app-header z-10 shrink-0 brand-gradient-bg text-white shadow-sm">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
             <Navigation className="h-5 w-5 text-teal-300" />
@@ -1021,7 +1013,7 @@ export default function App() {
               <>
                 <section
                   aria-labelledby="dashboard-title"
-                  className="rounded-[24px] bg-[#102a35] p-4 text-white shadow-lg shadow-slate-900/10 sm:p-5"
+                  className="rounded-[24px] brand-gradient-bg p-4 text-white shadow-lg shadow-slate-900/10 sm:p-5"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
@@ -1095,7 +1087,7 @@ export default function App() {
 
                   <button
                     onClick={handleStartTrip}
-                    className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-teal-700 px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
+                    className="brand-gradient-button flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
                   >
                     <MapPin className="h-5 w-5" />
                     Start trip
@@ -1106,7 +1098,7 @@ export default function App() {
 
             {tripState === 'tracking' && (
               <div className="space-y-4">
-                <div className="relative overflow-hidden rounded-[28px] bg-[#102a35] p-6 text-white shadow-lg shadow-slate-900/10 sm:p-7">
+                <div className="relative overflow-hidden rounded-[28px] brand-gradient-bg p-6 text-white shadow-lg shadow-slate-900/10 sm:p-7">
                   <div className="absolute right-0 top-0 h-40 w-40 translate-x-12 -translate-y-16 rounded-full bg-teal-400/10 blur-2xl" />
                   <div className="relative flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
@@ -1222,11 +1214,11 @@ export default function App() {
 
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-slate-600">
-                        Assigned By
+                        Assigned Person
                       </label>
                       <input
                         type="text"
-                        list="managersList"
+                        list="assignedPeopleList"
                         placeholder="Select or type..."
                         value={currentTrip.assignedBy}
                         onChange={e =>
@@ -1237,9 +1229,9 @@ export default function App() {
                         }
                         className={inputClass}
                       />
-                      <datalist id="managersList">
-                        {managers.map(m => (
-                          <option key={m} value={m} />
+                      <datalist id="assignedPeopleList">
+                        {assignedPeople.map(person => (
+                          <option key={person} value={person} />
                         ))}
                       </datalist>
                     </div>
@@ -1317,7 +1309,7 @@ export default function App() {
 
                     <button
                       onClick={finalizeTrip}
-                      className="flex min-h-12 flex-[2] items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                      className="brand-gradient-button flex min-h-12 flex-[2] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-md transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
                     >
                       <Save className="w-4 h-4" />
                       Save Record
@@ -1344,7 +1336,7 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={exportCSV}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
                 >
                   <Download className="h-4 w-4" />
                   CSV
@@ -1378,7 +1370,7 @@ export default function App() {
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[#102a35] p-5 text-white shadow-lg shadow-slate-900/10">
+            <div className="rounded-2xl brand-gradient-bg p-5 text-white shadow-lg shadow-slate-900/10">
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">
                 {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
               </h3>
@@ -1450,7 +1442,7 @@ export default function App() {
                 type="search"
                 value={reportSearch}
                 onChange={event => setReportSearch(event.target.value)}
-                placeholder="Search visitor, manager, place, purpose"
+                placeholder="Search visitor, assigned person, place, purpose"
                 aria-label="Search trips"
                 className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
               />
@@ -1574,7 +1566,7 @@ export default function App() {
                                     />
                                   </label>
                                   <label className="text-xs font-semibold text-slate-500">
-                                    Assigned manager
+                                    Assigned Person
                                     <input
                                       value={editingTripForm.assignedBy}
                                       onChange={event => setEditingTripForm({ ...editingTripForm, assignedBy: event.target.value })}
@@ -1631,7 +1623,7 @@ export default function App() {
                                   <button
                                     type="button"
                                     onClick={() => saveEditedTrip(Number(trip.id))}
-                                    className="min-h-11 flex-1 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white"
+                                    className="brand-gradient-button min-h-11 flex-1 rounded-xl px-3 py-2.5 text-sm font-bold text-white"
                                   >
                                     Save changes
                                   </button>
@@ -1749,7 +1741,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={savePetrolRate}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                className="brand-gradient-button flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
               >
                 <Save className="h-4 w-4" />
                 Save petrol rate
@@ -1781,7 +1773,7 @@ export default function App() {
                   type="button"
                   onClick={() => { saveVisitor(visitorInput); setVisitorInput(''); }}
                   aria-label="Add visitor or client"
-                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-teal-700 text-white hover:bg-teal-800"
+                  className="brand-gradient-button flex min-h-11 min-w-11 items-center justify-center rounded-xl text-white"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -1793,7 +1785,7 @@ export default function App() {
                       <span className="max-w-[210px] truncate">{visitor}</span>
                       <button
                         type="button"
-                        onClick={() => removeSavedName('visitor', visitor)}
+                        onClick={() => removeSavedVisitor(visitor)}
                         aria-label={`Remove ${visitor}`}
                         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-teal-700 hover:bg-teal-100"
                       >
@@ -1804,54 +1796,6 @@ export default function App() {
                 </div>
               ) : (
                 <p className="text-xs text-slate-400">No saved clients yet. Names are also remembered when trips are saved.</p>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-1 font-bold text-[#102a35]">Managers</h3>
-              <p className="mb-4 text-sm text-slate-500">Manage the manager suggestions shown on the trip form.</p>
-              <div className="mb-4 flex gap-2">
-                <input
-                  type="text"
-                  value={managerInput}
-                  onChange={event => setManagerInput(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      saveManager(managerInput);
-                      setManagerInput('');
-                    }
-                  }}
-                  placeholder="Add a manager"
-                  className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => { saveManager(managerInput); setManagerInput(''); }}
-                  aria-label="Add manager"
-                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-teal-700 text-white hover:bg-teal-800"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              </div>
-              {managers.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {managers.map(manager => (
-                    <span key={manager} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-xs font-medium text-slate-700">
-                      <span className="max-w-[210px] truncate">{manager}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeSavedName('manager', manager)}
-                        aria-label={`Remove ${manager}`}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400">No saved managers.</p>
               )}
             </div>
 
@@ -1867,7 +1811,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={createBackup}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
+                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-white"
                 >
                   <Database className="h-4 w-4" />
                   Backup data
