@@ -44,6 +44,8 @@ export default function App() {
   const [dateTo, setDateTo] = useState('');
   const [editingTripId, setEditingTripId] = useState<number | null>(null);
   const [editingTripForm, setEditingTripForm] = useState<any>(null);
+  const [showPastTripForm, setShowPastTripForm] = useState(false);
+  const [pastTripForm, setPastTripForm] = useState<any>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   const [currentTrip, setCurrentTrip] = useState({
@@ -450,6 +452,118 @@ export default function App() {
     cancelEditTrip();
   };
 
+  const openPastTripForm = () => {
+    if (!recordedByName.trim()) {
+      alert('Please set the name for this phone in Settings before adding a past trip.');
+      setActiveTab('settings');
+      return;
+    }
+
+    const now = new Date();
+    setPastTripForm({
+      date: getTripDateKey(now),
+      time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+      fromLoc: 'Office',
+      toLoc: '',
+      visitor: '',
+      assignedBy: assignedPeople[0] || '',
+      totalKm: '',
+      parkingFees: '0',
+      purpose: ''
+    });
+    setShowPastTripForm(true);
+  };
+
+  const cancelPastTrip = () => {
+    setShowPastTripForm(false);
+    setPastTripForm(null);
+  };
+
+  const savePastTrip = () => {
+    if (!pastTripForm) return;
+    if (!recordedByName.trim()) {
+      alert('Please set the name for this phone in Settings before adding a past trip.');
+      setActiveTab('settings');
+      return;
+    }
+
+    const [year, month, day] = String(pastTripForm.date || '').split('-').map(Number);
+    const [hours, minutes] = String(pastTripForm.time || '').split(':').map(Number);
+    const tripStart = new Date(year, month - 1, day, hours, minutes);
+    if (
+      !Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) ||
+      !Number.isFinite(hours) || !Number.isFinite(minutes) ||
+      tripStart.getFullYear() !== year || tripStart.getMonth() !== month - 1 ||
+      tripStart.getDate() !== day || hours < 0 || hours > 23 ||
+      minutes < 0 || minutes > 59
+    ) {
+      alert('Choose a valid trip date and start time.');
+      return;
+    }
+    if (tripStart.getTime() > Date.now()) {
+      alert('Choose a trip date and time that has already happened.');
+      return;
+    }
+
+    const visitor = String(pastTripForm.visitor || '').trim();
+    const assignedBy = String(pastTripForm.assignedBy || '').trim();
+    const fromLoc = String(pastTripForm.fromLoc || '').trim();
+    const toLoc = String(pastTripForm.toLoc || '').trim();
+    const totalKm = Number(pastTripForm.totalKm);
+    const parkingFees = Number(pastTripForm.parkingFees);
+    if (!visitor || !assignedBy || !fromLoc || !toLoc) {
+      alert('Enter the starting point, destination, visitor, and assigned person.');
+      return;
+    }
+    if (!Number.isFinite(totalKm) || totalKm <= 0 ||
+        !Number.isFinite(parkingFees) || parkingFees < 0) {
+      alert('Enter a distance greater than 0 and a valid parking fee.');
+      return;
+    }
+
+    const ratePerKm = petrolRate;
+    const petrolCharges = totalKm * ratePerKm;
+    const latestId = trips.reduce((max, trip) => Math.max(max, Number(trip.id) || 0), 0);
+    const tripRecord = {
+      id: Math.max(Date.now(), latestId + 1),
+      date: tripStart.toLocaleDateString('en-GB').split('/').join('-'),
+      visitor,
+      assignedBy,
+      recordedBy: recordedByName.trim(),
+      fromLoc,
+      toLoc,
+      actualKm: totalKm,
+      totalKm,
+      ratePerKm,
+      petrolCharges,
+      parkingFees,
+      totalAmount: petrolCharges + parkingFees,
+      purpose: String(pastTripForm.purpose || '').trim(),
+      startTime: tripStart.getTime(),
+      endTime: tripStart.getTime(),
+      startCoords: null,
+      endCoords: null,
+      manualEntry: true
+    };
+    const updatedTrips = [...trips, tripRecord];
+
+    saveDestination(fromLoc);
+    saveDestination(toLoc);
+    saveVisitor(visitor);
+    saveAssignedPerson(assignedBy);
+    setTrips(updatedTrips);
+    localStorage.setItem('invictusTrips', JSON.stringify(updatedTrips));
+    setSelectedMonth(currentMonth => {
+      const tripMonth = getTripMonthKey(tripRecord);
+      return currentMonth && currentMonth !== tripMonth ? tripMonth : currentMonth;
+    });
+    setReportSearch('');
+    setFilterVisitor('');
+    setDateFrom('');
+    setDateTo('');
+    cancelPastTrip();
+  };
+
   const csvEscape = (value: any) => {
     const text = String(value ?? '');
     return `"${text.replace(/"/g, '""')}"`;
@@ -502,7 +616,7 @@ export default function App() {
 
     const aStart = Number(a.startTime || a.id || 0) || 0;
     const bStart = Number(b.startTime || b.id || 0) || 0;
-    return aStart - bStart;
+    return aStart - bStart || Number(a.id || 0) - Number(b.id || 0);
   };
 
   const sumTripKm = (records: any[]) =>
@@ -750,7 +864,7 @@ export default function App() {
         trip.date || '-',
         trip.visitor || '-',
         trip.assignedBy || '-',
-        `${trip.fromLoc || '-'} → ${trip.toLoc || '-'}`,
+        `${trip.fromLoc || '-'} TO ${trip.toLoc || '-'}`,
         trip.purpose || '-',
         (Number(trip.totalKm) || 0).toFixed(1),
         formatRupees(getTripPetrolAmount(trip)),
@@ -1404,6 +1518,163 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {!showPastTripForm ? (
+              <button
+                type="button"
+                onClick={openPastTripForm}
+                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <Plus className="h-4 w-4" />
+                Add a past trip
+              </button>
+            ) : pastTripForm ? (
+              <form
+                onSubmit={event => {
+                  event.preventDefault();
+                  savePastTrip();
+                }}
+                className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div>
+                  <h3 className="text-base font-bold text-[#102a35]">Add a past trip</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Enter the route and distance manually. Petrol uses your saved rate of {formatRupees(petrolRate)} per km.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Trip date
+                    <input
+                      type="date"
+                      required
+                      max={getTripDateKey(new Date())}
+                      value={pastTripForm.date}
+                      onChange={event => setPastTripForm({ ...pastTripForm, date: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Start time
+                    <input
+                      type="time"
+                      required
+                      value={pastTripForm.time}
+                      onChange={event => setPastTripForm({ ...pastTripForm, time: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    From
+                    <input
+                      required
+                      list="past-trip-locations"
+                      value={pastTripForm.fromLoc}
+                      onChange={event => setPastTripForm({ ...pastTripForm, fromLoc: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    To
+                    <input
+                      required
+                      list="past-trip-locations"
+                      value={pastTripForm.toLoc}
+                      onChange={event => setPastTripForm({ ...pastTripForm, toLoc: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Visitor / client
+                    <input
+                      required
+                      list="past-trip-visitors"
+                      value={pastTripForm.visitor}
+                      onChange={event => setPastTripForm({ ...pastTripForm, visitor: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Assigned person
+                    <input
+                      required
+                      list="past-trip-assigned-people"
+                      value={pastTripForm.assignedBy}
+                      onChange={event => setPastTripForm({ ...pastTripForm, assignedBy: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Distance (km)
+                    <input
+                      type="number"
+                      required
+                      min="0.1"
+                      step="0.1"
+                      value={pastTripForm.totalKm}
+                      onChange={event => setPastTripForm({ ...pastTripForm, totalKm: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Parking fee
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pastTripForm.parkingFees}
+                      onChange={event => setPastTripForm({ ...pastTripForm, parkingFees: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <label className="block text-xs font-semibold text-slate-500">
+                  Purpose
+                  <input
+                    value={pastTripForm.purpose}
+                    onChange={event => setPastTripForm({ ...pastTripForm, purpose: event.target.value })}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                  />
+                </label>
+
+                <datalist id="past-trip-locations">
+                  {savedDestinations.map(destination => <option key={destination} value={destination} />)}
+                </datalist>
+                <datalist id="past-trip-visitors">
+                  {getAvailableVisitors().map(visitor => <option key={visitor} value={visitor} />)}
+                </datalist>
+                <datalist id="past-trip-assigned-people">
+                  {assignedPeople.map(person => <option key={person} value={person} />)}
+                </datalist>
+
+                <div className="flex gap-3 border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={cancelPastTrip}
+                    className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="brand-gradient-button flex-[2] rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  >
+                    Save past trip
+                  </button>
+                </div>
+              </form>
+            ) : null}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
