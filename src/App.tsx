@@ -10,7 +10,12 @@ import {
   Plus,
   Save,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  FileText,
+  Trash2,
+  Upload,
+  Database,
+  UserRound
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -26,7 +31,19 @@ export default function App() {
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
+  const [savedVisitors, setSavedVisitors] = useState<string[]>([]);
+  const [managerInput, setManagerInput] = useState('');
+  const [visitorInput, setVisitorInput] = useState('');
+  const [petrolRate, setPetrolRate] = useState(5);
+  const [rateInput, setRateInput] = useState('5');
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [reportSearch, setReportSearch] = useState('');
+  const [filterVisitor, setFilterVisitor] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [editingTripId, setEditingTripId] = useState<number | null>(null);
+  const [editingTripForm, setEditingTripForm] = useState<any>(null);
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   const [currentTrip, setCurrentTrip] = useState({
     startCoords: null as any,
@@ -53,11 +70,16 @@ export default function App() {
       localStorage.getItem('invictusManagers') ||
       '["Ramu sir", "KV Mam", "Lakshmi Mam", "swetha mam"]'
     );
+    const savedVisitors = JSON.parse(localStorage.getItem('invictusVisitors') || '[]');
+    const savedRate = Number(localStorage.getItem('invictusRate') ?? 5);
 
     setTrips(savedTrips);
     setOfficeLocation(savedOffice);
     setSavedDestinations(savedDests);
     setManagers(savedManagers);
+    setSavedVisitors(savedVisitors);
+    setPetrolRate(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5);
+    setRateInput(String(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5));
   }, []);
 
   useEffect(() => {
@@ -209,11 +231,50 @@ export default function App() {
   };
 
   const saveManager = (managerName: string) => {
-    if (managerName && !managers.includes(managerName)) {
-      const updated = [...managers, managerName];
+    const normalizedName = managerName.trim();
+    if (normalizedName && !managers.some(name => name.toLowerCase() === normalizedName.toLowerCase())) {
+      const updated = [...managers, normalizedName];
       setManagers(updated);
       localStorage.setItem('invictusManagers', JSON.stringify(updated));
     }
+  };
+
+  const saveVisitor = (visitorName: string) => {
+    const normalizedName = visitorName.trim();
+    if (normalizedName && !savedVisitors.some(name => name.toLowerCase() === normalizedName.toLowerCase())) {
+      const updated = [...savedVisitors, normalizedName];
+      setSavedVisitors(updated);
+      localStorage.setItem('invictusVisitors', JSON.stringify(updated));
+    }
+  };
+
+  const removeSavedName = (kind: 'manager' | 'visitor', name: string) => {
+    if (kind === 'manager') {
+      const updated = managers.filter(item => item !== name);
+      setManagers(updated);
+      localStorage.setItem('invictusManagers', JSON.stringify(updated));
+      return;
+    }
+
+    const updated = savedVisitors.filter(item => item !== name);
+    setSavedVisitors(updated);
+    localStorage.setItem('invictusVisitors', JSON.stringify(updated));
+  };
+
+  const savePetrolRate = () => {
+    if (!rateInput.trim()) {
+      alert('Enter the petrol reimbursement rate per kilometre.');
+      return;
+    }
+    const nextRate = Number(rateInput);
+    if (!Number.isFinite(nextRate) || nextRate < 0) {
+      alert('Enter a valid petrol rate of ₹0 or more per kilometre.');
+      return;
+    }
+
+    setPetrolRate(nextRate);
+    localStorage.setItem('invictusRate', String(nextRate));
+    alert('Petrol rate saved. Existing trips keep their saved rate.');
   };
 
   const finalizeTrip = () => {
@@ -236,15 +297,16 @@ export default function App() {
       fromLoc: currentTrip.fromLoc,
       toLoc: currentTrip.toLoc,
       totalKm: km,
-      ratePerKm: 5,
-      petrolCharges: km * 5,
+      ratePerKm: petrolRate,
+      petrolCharges: km * petrolRate,
       parkingFees: parking,
-      totalAmount: km * 5 + parking,
+      totalAmount: km * petrolRate + parking,
       purpose: currentTrip.purpose,
       startTime: currentTrip.startTime,
       endTime: currentTrip.endTime
     };
 
+    saveVisitor(currentTrip.visitor);
     const newTrips = [...trips, tripRecord];
     setTrips(newTrips);
     localStorage.setItem('invictusTrips', JSON.stringify(newTrips));
@@ -268,11 +330,104 @@ export default function App() {
   };
 
   const deleteTrip = (id: number) => {
-    if (window.confirm('Delete this trip?')) {
+    if (window.confirm('Delete this trip? This cannot be undone.')) {
       const filtered = trips.filter(t => t.id !== id);
       setTrips(filtered);
       localStorage.setItem('invictusTrips', JSON.stringify(filtered));
+      if (editingTripId === id) {
+        setEditingTripId(null);
+        setEditingTripForm(null);
+      }
     }
+  };
+
+  const beginEditTrip = (trip: any) => {
+    const tripDate = getTripDate(trip);
+    setEditingTripId(Number(trip.id));
+    setEditingTripForm({
+      date: tripDate ? getTripDateKey(tripDate) : '',
+      visitor: trip.visitor || '',
+      assignedBy: trip.assignedBy || '',
+      fromLoc: trip.fromLoc || '',
+      toLoc: trip.toLoc || '',
+      totalKm: String(Number(trip.totalKm) || 0),
+      parkingFees: String(Number(trip.parkingFees) || 0),
+      purpose: trip.purpose || ''
+    });
+  };
+
+  const cancelEditTrip = () => {
+    setEditingTripId(null);
+    setEditingTripForm(null);
+  };
+
+  const saveEditedTrip = (tripId: number) => {
+    if (!editingTripForm?.date || !editingTripForm.visitor.trim() ||
+        !editingTripForm.assignedBy.trim() || !editingTripForm.toLoc.trim()) {
+      alert('Enter the date, destination, visitor, and assigned manager.');
+      return;
+    }
+
+    const [year, month, day] = editingTripForm.date.split('-').map(Number);
+    const selectedDay = new Date(year, month - 1, day);
+    if (
+      !Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) ||
+      selectedDay.getFullYear() !== year || selectedDay.getMonth() !== month - 1 ||
+      selectedDay.getDate() !== day
+    ) {
+      alert('Choose a valid trip date.');
+      return;
+    }
+
+    const originalTrip = trips.find(trip => Number(trip.id) === tripId);
+    if (!originalTrip) return;
+
+    const originalTripDate = getTripDate(originalTrip);
+    const originalStartTime = Number(originalTrip.startTime) || originalTripDate?.getTime() || selectedDay.getTime();
+    const originalStart = new Date(originalStartTime);
+    selectedDay.setHours(
+      originalStart.getHours(),
+      originalStart.getMinutes(),
+      originalStart.getSeconds(),
+      originalStart.getMilliseconds()
+    );
+
+    const totalKm = Number(editingTripForm.totalKm);
+    const parkingFees = Number(editingTripForm.parkingFees);
+    if (!Number.isFinite(totalKm) || totalKm < 0 || !Number.isFinite(parkingFees) || parkingFees < 0) {
+      alert('Enter valid non-negative values for distance and parking.');
+      return;
+    }
+
+    const ratePerKm = Number(originalTrip.ratePerKm ?? petrolRate);
+    const petrolCharges = totalKm * ratePerKm;
+    const dateShift = selectedDay.getTime() - originalStartTime;
+    const updatedTrips = trips.map(trip => {
+      if (Number(trip.id) !== tripId) return trip;
+      return {
+        ...trip,
+        date: selectedDay.toLocaleDateString('en-GB').replace(/\//g, '-'),
+        startTime: selectedDay.getTime(),
+        endTime: trip.endTime ? Number(trip.endTime) + dateShift : trip.endTime,
+        visitor: editingTripForm.visitor.trim(),
+        assignedBy: editingTripForm.assignedBy.trim(),
+        fromLoc: editingTripForm.fromLoc.trim(),
+        toLoc: editingTripForm.toLoc.trim(),
+        totalKm,
+        ratePerKm,
+        petrolCharges,
+        parkingFees,
+        totalAmount: petrolCharges + parkingFees,
+        purpose: editingTripForm.purpose.trim()
+      };
+    });
+
+    saveVisitor(editingTripForm.visitor);
+    saveManager(editingTripForm.assignedBy);
+    saveDestination(editingTripForm.toLoc);
+    setTrips(updatedTrips);
+    localStorage.setItem('invictusTrips', JSON.stringify(updatedTrips));
+    cancelEditTrip();
   };
 
   const csvEscape = (value: any) => {
@@ -320,12 +475,21 @@ export default function App() {
   const sumTripKm = (records: any[]) =>
     records.reduce((sum, trip) => sum + (Number(trip.totalKm) || 0), 0);
 
+  const getTripPetrolAmount = (trip: any) =>
+    Number(trip.petrolCharges ??
+      (Number(trip.totalKm) || 0) * Number(trip.ratePerKm ?? 5)) || 0;
+
   const sumPetrolAmount = (records: any[]) =>
-    records.reduce((sum, trip) => {
-      const savedAmount = trip.petrolCharges ??
-        (Number(trip.totalKm) || 0) * Number(trip.ratePerKm ?? 5);
-      return sum + (Number(savedAmount) || 0);
-    }, 0);
+    records.reduce((sum, trip) => sum + getTripPetrolAmount(trip), 0);
+
+  const sumParkingAmount = (records: any[]) =>
+    records.reduce((sum, trip) => sum + (Number(trip.parkingFees) || 0), 0);
+
+  const getTripTotalAmount = (trip: any) =>
+    Number(trip.totalAmount ?? (getTripPetrolAmount(trip) + (Number(trip.parkingFees) || 0))) || 0;
+
+  const sumTotalAmount = (records: any[]) =>
+    records.reduce((sum, trip) => sum + getTripTotalAmount(trip), 0);
 
   const formatRupees = (amount: number) =>
     `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -358,29 +522,80 @@ export default function App() {
   const getFilteredTrips = () =>
     selectedMonth ? trips.filter(t => getTripMonthKey(t) === selectedMonth) : trips;
 
+  const reportTrips = getFilteredTrips();
+  const reportKm = sumTripKm(reportTrips);
+  const reportPetrol = sumPetrolAmount(reportTrips);
+  const reportParking = sumParkingAmount(reportTrips);
+  const reportGrandTotal = sumTotalAmount(reportTrips);
+
+  const getAvailableVisitors = () =>
+    Array.from(new Set([
+      ...savedVisitors,
+      ...trips.map(trip => String(trip.visitor || '').trim()).filter(Boolean)
+    ])).sort((a, b) => a.localeCompare(b));
+
+  const getHistoryTrips = () => {
+    const search = reportSearch.trim().toLocaleLowerCase();
+
+    return getFilteredTrips()
+      .filter(trip => {
+        const tripDate = getTripDate(trip);
+        const tripDateKey = tripDate ? getTripDateKey(tripDate) : '';
+        if (dateFrom && (!tripDateKey || tripDateKey < dateFrom)) return false;
+        if (dateTo && (!tripDateKey || tripDateKey > dateTo)) return false;
+        if (filterVisitor && trip.visitor !== filterVisitor) return false;
+        if (!search) return true;
+
+        const searchFields = [
+          trip.visitor,
+          trip.assignedBy,
+          trip.fromLoc,
+          trip.toLoc,
+          trip.purpose
+        ].join(' ').toLocaleLowerCase();
+        return searchFields.includes(search);
+      })
+      .sort((a, b) => {
+        const aTime = getTripDate(a)?.getTime() || 0;
+        const bTime = getTripDate(b)?.getTime() || 0;
+        return bTime - aTime || Number(b.id || 0) - Number(a.id || 0);
+      });
+  };
+
+  const clearHistoryFilters = () => {
+    setReportSearch('');
+    setFilterVisitor('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   const buildCSV = (reportTrips = getFilteredTrips()) => {
     const headers = [
-      'Sn.',
-      'DATE',
-      'VISITOR PERSON',
-      'ASSIGNED BY',
-      'FROM',
-      'TO',
-      "TOTAL KM's",
-      'RATE PER KM',
-      'Petrol Charges',
-      'PARKING FEES',
-      'TOTAL AMOUNT',
-      'PURPOSE & SIGS'
+      'No.',
+      'Date',
+      'Visitor / Client',
+      'Assigned Manager',
+      'From',
+      'To',
+      'Distance (km)',
+      'Rate (₹ / km)',
+      'Petrol Reimbursement (₹)',
+      'Parking (₹)',
+      'Grand Total (₹)',
+      'Purpose / Remarks'
     ];
 
     let csvContent = headers.map(csvEscape).join(',') + '\n';
     let totalKm = 0;
-    let totalAmount = 0;
+    let totalPetrol = 0;
+    let totalParking = 0;
+    let grandTotal = 0;
 
     reportTrips.forEach((t, i) => {
       totalKm += Number(t.totalKm) || 0;
-      totalAmount += Number(t.totalAmount) || 0;
+      totalPetrol += getTripPetrolAmount(t);
+      totalParking += Number(t.parkingFees) || 0;
+      grandTotal += getTripTotalAmount(t);
 
       const row = [
         i + 1,
@@ -390,17 +605,17 @@ export default function App() {
         t.fromLoc,
         t.toLoc,
         Number(t.totalKm || 0).toFixed(1),
-        t.ratePerKm,
-        Number(t.petrolCharges || 0).toFixed(2),
+        Number(t.ratePerKm ?? petrolRate).toFixed(2),
+        getTripPetrolAmount(t).toFixed(2),
         Number(t.parkingFees || 0).toFixed(2),
-        Number(t.totalAmount || 0).toFixed(2),
+        getTripTotalAmount(t).toFixed(2),
         t.purpose
       ];
 
       csvContent += row.map(csvEscape).join(',') + '\n';
     });
 
-    csvContent += `,,,,,TOTALS,${totalKm.toFixed(1)},,,,${totalAmount.toFixed(2)},\n`;
+    csvContent += `,,,,,TOTALS,${totalKm.toFixed(1)},,${totalPetrol.toFixed(2)},${totalParking.toFixed(2)},${grandTotal.toFixed(2)},\n`;
 
     return csvContent;
   };
@@ -419,9 +634,10 @@ export default function App() {
     }
 
     const csvContent = buildCSV(reportTrips);
+    const exportDate = getTripDateKey(new Date());
     const fileName = selectedMonth
-      ? `Petrol_Expenses_${selectedMonth}.csv`
-      : 'Petrol_Expenses_All_Months.csv';
+      ? `Invictus_Trip_Report_${selectedMonth}_Exported_${exportDate}.csv`
+      : `Invictus_Trip_Report_All_Months_${exportDate}.csv`;
 
     try {
       if (Capacitor.isNativePlatform()) {
@@ -469,6 +685,295 @@ export default function App() {
     }
   };
 
+  const exportPDF = async () => {
+    if (trips.length === 0) {
+      alert('No trips to export');
+      return;
+    }
+
+    const selectedTrips = getFilteredTrips();
+    if (selectedTrips.length === 0) {
+      alert('No trips found for the selected month');
+      return;
+    }
+
+    const totalKm = sumTripKm(selectedTrips);
+    const totalPetrol = sumPetrolAmount(selectedTrips);
+    const totalParking = sumParkingAmount(selectedTrips);
+    const grandTotal = sumTotalAmount(selectedTrips);
+    const generatedOn = new Date().toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+    const exportDate = getTripDateKey(new Date());
+    const fileName = selectedMonth
+      ? `Invictus_Trip_Report_${selectedMonth}_Exported_${exportDate}.pdf`
+      : `Invictus_Trip_Report_All_Months_${exportDate}.pdf`;
+    const rows = selectedTrips
+      .slice()
+      .sort((a, b) => (getTripDate(b)?.getTime() || 0) - (getTripDate(a)?.getTime() || 0))
+      .map((trip, index) => [
+        String(index + 1),
+        trip.date || '-',
+        trip.visitor || '-',
+        trip.assignedBy || '-',
+        `${trip.fromLoc || '-'} → ${trip.toLoc || '-'}`,
+        trip.purpose || '-',
+        (Number(trip.totalKm) || 0).toFixed(1),
+        formatRupees(getTripPetrolAmount(trip)),
+        formatRupees(Number(trip.parkingFees) || 0),
+        formatRupees(getTripTotalAmount(trip))
+      ]);
+
+    const documentDefinition: any = {
+      pageSize: 'A4',
+      pageOrientation: 'landscape',
+      pageMargins: [28, 38, 28, 38],
+      content: [
+        { text: 'INVICTUS · FIELD TRACKER', style: 'eyebrow' },
+        { text: 'Trip & Petrol Expense Report', style: 'title' },
+        { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}  ·  Generated ${generatedOn}`, style: 'subtitle' },
+        {
+          margin: [0, 14, 0, 14],
+          table: {
+            widths: ['*', '*', '*', '*', '*'],
+            body: [[
+              { text: `TRIPS\n${selectedTrips.length}`, style: 'summary' },
+              { text: `TOTAL KM\n${totalKm.toFixed(1)}`, style: 'summary' },
+              { text: `PETROL\n${formatRupees(totalPetrol)}`, style: 'summary' },
+              { text: `PARKING\n${formatRupees(totalParking)}`, style: 'summary' },
+              { text: `GRAND TOTAL\n${formatRupees(grandTotal)}`, style: 'summaryHighlight' }
+            ]]
+          },
+          layout: {
+            hLineWidth: () => 0,
+            vLineWidth: () => 5,
+            vLineColor: () => '#ffffff',
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 9,
+            paddingBottom: () => 9
+          }
+        },
+        {
+          table: {
+            headerRows: 1,
+            widths: [22, 50, 78, 68, '*', '*', 36, 56, 52, 58],
+            body: [[
+              'No.', 'Date', 'Visitor / Client', 'Manager', 'Route', 'Purpose',
+              'KM', 'Petrol', 'Parking', 'Total'
+            ], ...rows, [
+              { text: 'TOTALS', colSpan: 6, alignment: 'right', bold: true },
+              {}, {}, {}, {}, {},
+              { text: totalKm.toFixed(1), bold: true },
+              { text: formatRupees(totalPetrol), bold: true },
+              { text: formatRupees(totalParking), bold: true },
+              { text: formatRupees(grandTotal), bold: true }
+            ]]
+          },
+          layout: {
+            hLineColor: () => '#dbe4e8',
+            vLineWidth: () => 0,
+            paddingLeft: () => 4,
+            paddingRight: () => 4,
+            paddingTop: () => 5,
+            paddingBottom: () => 5
+          }
+        }
+      ],
+      styles: {
+        eyebrow: { fontSize: 8, bold: true, color: '#0f766e', characterSpacing: 1.5 },
+        title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
+        subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
+        summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef7f6', alignment: 'center', lineHeight: 1.4 },
+        summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#0f766e', alignment: 'center', lineHeight: 1.4 }
+      },
+      defaultStyle: { font: 'Roboto', fontSize: 7, color: '#334155' }
+    };
+
+    try {
+      const [pdfMakeModule, pdfFontsModule] = await Promise.all([
+        import('pdfmake/build/pdfmake'),
+        import('pdfmake/build/vfs_fonts')
+      ]);
+      const pdfMake = pdfMakeModule.default;
+      (pdfMake as any).addVirtualFileSystem((pdfFontsModule as any).default);
+      const pdf = pdfMake.createPdf(documentDefinition);
+      if (Capacitor.isNativePlatform()) {
+        const base64 = await pdf.getBase64();
+        await Filesystem.writeFile({
+          path: fileName,
+          data: base64,
+          directory: Directory.Documents
+        });
+        const fileUri = await Filesystem.getUri({
+          path: fileName,
+          directory: Directory.Documents
+        });
+        await Share.share({
+          title: 'Invictus Trip Report',
+          text: 'Trip and petrol expense report',
+          url: fileUri.uri,
+          dialogTitle: 'Share / Save PDF Report'
+        });
+        return;
+      }
+
+      await pdf.download(fileName);
+    } catch (error: any) {
+      alert('PDF export failed: ' + (error?.message || 'Please try again.'));
+    }
+  };
+
+  const createBackup = async () => {
+    const backup = {
+      appId: 'invictus-tracker',
+      formatVersion: 1,
+      createdAt: new Date().toISOString(),
+      data: {
+        trips,
+        officeLocation,
+        savedDestinations,
+        managers,
+        savedVisitors,
+        petrolRate
+      }
+    };
+    const backupText = JSON.stringify(backup, null, 2);
+    const fileName = `Invictus_Tracker_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await Filesystem.writeFile({
+          path: fileName,
+          data: backupText,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+        const fileUri = await Filesystem.getUri({
+          path: fileName,
+          directory: Directory.Documents
+        });
+        await Share.share({
+          title: 'Invictus Tracker Backup',
+          text: 'Backup of trips and app settings',
+          url: fileUri.uri,
+          dialogTitle: 'Save or share backup'
+        });
+        return;
+      }
+
+      const blob = new Blob([backupText], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error: any) {
+      alert('Backup failed: ' + (error?.message || 'Please try again.'));
+    }
+  };
+
+  const restoreBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.size > 25 * 1024 * 1024) {
+        alert('This backup file is too large to restore.');
+        return;
+      }
+
+      const backup = JSON.parse(await file.text());
+      const data = backup?.data;
+      if (
+        backup?.appId !== 'invictus-tracker' ||
+        backup?.formatVersion !== 1 ||
+        !data ||
+        !Array.isArray(data.trips) ||
+        !Array.isArray(data.savedDestinations) ||
+        !Array.isArray(data.managers) ||
+        !Array.isArray(data.savedVisitors) ||
+        !data.savedDestinations.every((item: unknown) => typeof item === 'string') ||
+        !data.managers.every((item: unknown) => typeof item === 'string') ||
+        !data.savedVisitors.every((item: unknown) => typeof item === 'string')
+      ) {
+        alert('This is not a valid Invictus Tracker backup file.');
+        return;
+      }
+
+      const validRate = Number(data.petrolRate);
+      const validOffice = data.officeLocation === null ||
+        (typeof data.officeLocation?.lat === 'number' && Number.isFinite(data.officeLocation.lat) &&
+          typeof data.officeLocation?.lon === 'number' && Number.isFinite(data.officeLocation.lon));
+      const validTrips = data.trips.every((trip: any) =>
+        trip && typeof trip === 'object' &&
+        (typeof trip.id === 'number' || typeof trip.id === 'string') &&
+        typeof trip.date === 'string' &&
+        ['visitor', 'assignedBy', 'fromLoc', 'toLoc', 'purpose'].every((field: string) =>
+          trip[field] === undefined || trip[field] === null || typeof trip[field] === 'string'
+        ) &&
+        ['totalKm', 'ratePerKm', 'petrolCharges', 'parkingFees', 'totalAmount', 'startTime', 'endTime'].every((field: string) =>
+          trip[field] === undefined || trip[field] === null ||
+          (typeof trip[field] === 'number' && Number.isFinite(trip[field]))
+        )
+      );
+      if (!Number.isFinite(validRate) || validRate < 0 || !validOffice || !validTrips) {
+        alert('The backup contains invalid trip or setting data.');
+        return;
+      }
+
+      if (!window.confirm('Restore this backup? It will replace the trips and settings currently on this phone.')) {
+        return;
+      }
+
+      const restoredValues: Record<string, string> = {
+        invictusTrips: JSON.stringify(data.trips),
+        invictusOffice: JSON.stringify(data.officeLocation),
+        invictusDests: JSON.stringify(data.savedDestinations),
+        invictusManagers: JSON.stringify(data.managers),
+        invictusVisitors: JSON.stringify(data.savedVisitors),
+        invictusRate: String(validRate)
+      };
+      const keys = Object.keys(restoredValues);
+      const previousValues = new Map(keys.map(key => [key, localStorage.getItem(key)]));
+
+      try {
+        keys.forEach(key => localStorage.setItem(key, restoredValues[key]));
+      } catch (storageError) {
+        keys.forEach(key => {
+          const previous = previousValues.get(key);
+          try {
+            if (previous === null || previous === undefined) localStorage.removeItem(key);
+            else localStorage.setItem(key, previous);
+          } catch {
+            // Keep trying to restore the remaining saved values.
+          }
+        });
+        throw storageError;
+      }
+
+      setTrips(data.trips);
+      setOfficeLocation(data.officeLocation);
+      setSavedDestinations(data.savedDestinations);
+      setManagers(data.managers);
+      setSavedVisitors(data.savedVisitors);
+      setPetrolRate(validRate);
+      setRateInput(String(validRate));
+      setSelectedMonth('');
+      clearHistoryFilters();
+      cancelEditTrip();
+      alert('Backup restored successfully.');
+    } catch (error: any) {
+      alert('Restore failed: ' + (error?.message || 'Choose a valid backup file.'));
+    } finally {
+      input.value = '';
+    }
+  };
+
   const groupTripsByDate = () => {
     return trips.reduce((acc, trip) => {
       if (!acc[trip.date]) acc[trip.date] = [];
@@ -486,6 +991,7 @@ export default function App() {
     (sum, t) => sum + (Number(t.totalAmount) || 0),
     0
   );
+  const historyTrips = getHistoryTrips();
 
   const inputClass =
     'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
@@ -745,6 +1251,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
+                      list="visitorsList"
                       placeholder="e.g. Printer Shop, HDFC Bank"
                       value={currentTrip.visitor}
                       onChange={e =>
@@ -755,6 +1262,11 @@ export default function App() {
                       }
                       className={inputClass}
                     />
+                    <datalist id="visitorsList">
+                      {getAvailableVisitors().map(visitor => (
+                        <option key={visitor} value={visitor} />
+                      ))}
+                    </datalist>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -829,13 +1341,22 @@ export default function App() {
                 </h2>
               </div>
 
-              <button
-                onClick={exportCSV}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={exportCSV}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </button>
+                <button
+                  onClick={exportPDF}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <FileText className="h-4 w-4" />
+                  PDF
+                </button>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -853,7 +1374,7 @@ export default function App() {
                 ))}
               </select>
               <p className="mt-2 text-xs leading-5 text-slate-400">
-                Reports and CSV export use the selected month.
+                Reports and CSV / PDF exports use the selected month.
               </p>
             </div>
 
@@ -862,10 +1383,10 @@ export default function App() {
                 {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
               </h3>
 
-              <div className="grid grid-cols-3 gap-2 text-center sm:gap-3">
+              <div className="grid grid-cols-2 gap-2 text-center sm:gap-3">
                 <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
                   <div className="text-2xl font-bold tabular-nums">
-                    {getFilteredTrips().length}
+                    {reportTrips.length}
                   </div>
                   <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
                     TOTAL TRIPS
@@ -874,7 +1395,7 @@ export default function App() {
 
                 <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
                   <div className="text-2xl font-bold tabular-nums">
-                    {getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalKm) || 0), 0).toFixed(1)}
+                    {reportKm.toFixed(1)}
                   </div>
                   <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
                     TOTAL KM
@@ -883,35 +1404,117 @@ export default function App() {
 
                 <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
                   <div className="mt-0.5 text-xl font-bold tabular-nums">
-                    ₹{getFilteredTrips().reduce((sum, t) => sum + (Number(t.totalAmount) || 0), 0).toFixed(0)}
+                    {formatRupees(reportPetrol)}
                   </div>
                   <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    PETROL TOTAL
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
+                    {formatRupees(reportParking)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    PARKING TOTAL
+                  </div>
+                </div>
+
+                <div className="col-span-2 rounded-xl bg-teal-400/15 px-2 py-3 ring-1 ring-teal-200/20">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
+                    {formatRupees(reportGrandTotal)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-teal-100 sm:text-[10px]">
                     GRAND TOTAL
                   </div>
                 </div>
               </div>
             </div>
 
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[#102a35]">Find trips</h3>
+                  <p className="mt-0.5 text-xs text-slate-400">Newest first</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearHistoryFilters}
+                  className="rounded-lg px-2 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
+                >
+                  Clear filters
+                </button>
+              </div>
+
+              <input
+                type="search"
+                value={reportSearch}
+                onChange={event => setReportSearch(event.target.value)}
+                placeholder="Search visitor, manager, place, purpose"
+                aria-label="Search trips"
+                className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-slate-500">
+                  From date
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={event => setDateFrom(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500">
+                  To date
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={event => setDateTo(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-3 block text-xs font-semibold text-slate-500">
+                Visitor / client
+                <select
+                  value={filterVisitor}
+                  onChange={event => setFilterVisitor(event.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700"
+                >
+                  <option value="">All visitors / clients</option>
+                  {getAvailableVisitors().map(visitor => (
+                    <option key={visitor} value={visitor}>{visitor}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             {trips.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
                 No trips recorded yet.
               </div>
+            ) : historyTrips.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
+                No trips match these filters.
+              </div>
             ) : (
-              Object.entries(
-                getFilteredTrips().reduce((acc, trip) => {
-                  if (!acc[trip.date]) acc[trip.date] = [];
-                  acc[trip.date].push(trip);
-                  return acc;
-                }, {} as Record<string, any[]>)
-              )
-                .reverse()
-                .map(([date, dayTrips]) => {
+              (
+                Object.entries(
+                  historyTrips.reduce((acc, trip) => {
+                    if (!acc[trip.date]) acc[trip.date] = [];
+                    acc[trip.date].push(trip);
+                    return acc;
+                  }, {} as Record<string, any[]>)
+                ) as [string, any[]][]
+              ).map(([date, dayTrips]) => {
                   const dayKm = dayTrips.reduce(
                     (sum, t) => sum + (Number(t.totalKm) || 0),
                     0
                   );
                   const dayAmount = dayTrips.reduce(
-                    (sum, t) => sum + (Number(t.totalAmount) || 0),
+                    (sum, t) => sum + getTripTotalAmount(t),
                     0
                   );
 
@@ -937,44 +1540,148 @@ export default function App() {
 
                       <div className="divide-y divide-slate-100">
                         {dayTrips.map(trip => (
-                          <div
-                            key={trip.id}
-                            className="relative flex flex-col gap-2 p-4 group"
-                          >
-                            <button
-                              onClick={() => deleteTrip(trip.id)}
-                              className="absolute top-4 right-4 text-xs text-red-400 opacity-0 group-hover:opacity-100 transition"
-                            >
-                              Delete
-                            </button>
+                          <div key={trip.id} className="flex flex-col gap-3 p-4">
+                            {editingTripId === Number(trip.id) && editingTripForm ? (
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-[#102a35]">Edit trip</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    Date
+                                    <input
+                                      type="date"
+                                      value={editingTripForm.date}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, date: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    Distance (km)
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.1"
+                                      value={editingTripForm.totalKm}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, totalKm: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    Visitor / client
+                                    <input
+                                      value={editingTripForm.visitor}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, visitor: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    Assigned manager
+                                    <input
+                                      value={editingTripForm.assignedBy}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, assignedBy: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    From
+                                    <input
+                                      value={editingTripForm.fromLoc}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, fromLoc: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    To
+                                    <input
+                                      value={editingTripForm.toLoc}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, toLoc: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-500">
+                                    Parking (₹)
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={editingTripForm.parkingFees}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, parkingFees: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                  <label className="col-span-2 text-xs font-semibold text-slate-500">
+                                    Purpose / remarks
+                                    <input
+                                      value={editingTripForm.purpose}
+                                      onChange={event => setEditingTripForm({ ...editingTripForm, purpose: event.target.value })}
+                                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-2.5 py-2.5 text-sm text-slate-700"
+                                    />
+                                  </label>
+                                </div>
+                                <p className="text-xs text-slate-400">
+                                  Petrol uses this trip’s saved rate of {formatRupees(Number(trip.ratePerKm ?? 5))} per km.
+                                </p>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditTrip}
+                                    className="min-h-11 flex-1 rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => saveEditedTrip(Number(trip.id))}
+                                    className="min-h-11 flex-1 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white"
+                                  >
+                                    Save changes
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold text-slate-800">
+                                      {trip.visitor}
+                                      <span className="ml-1 font-normal text-slate-400">({trip.assignedBy})</span>
+                                    </p>
+                                  </div>
+                                  <span className="shrink-0 text-sm font-semibold text-teal-800">
+                                    {Number(trip.totalKm || 0).toFixed(1)} km
+                                  </span>
+                                </div>
 
-                            <div className="flex justify-between items-start">
-                              <span className="min-w-0 pr-14 text-sm font-bold text-slate-800">
-                                {trip.visitor}
-                                <span className="text-slate-400 font-normal ml-1">
-                                  ({trip.assignedBy})
-                                </span>
-                              </span>
+                                <div className="flex min-w-0 items-center text-xs font-medium text-slate-500">
+                                  <span className="truncate">{trip.fromLoc}</span>
+                                  <RefreshCw className="mx-2 h-3 w-3 shrink-0 text-slate-300" />
+                                  <span className="truncate">{trip.toLoc}</span>
+                                </div>
 
-                              <span className="shrink-0 text-sm font-semibold text-teal-800">
-                                {trip.totalKm} km
-                              </span>
-                            </div>
+                                <div className="flex items-end justify-between gap-3">
+                                  <span className="text-xs italic text-slate-400">{trip.purpose || '-'}</span>
+                                  <span className="shrink-0 text-xs font-bold text-slate-700">
+                                    {formatRupees(getTripTotalAmount(trip))}
+                                  </span>
+                                </div>
 
-                            <div className="flex min-w-0 items-center text-xs font-medium text-slate-500">
-                              <span>{trip.fromLoc}</span>
-                              <RefreshCw className="w-3 h-3 mx-2 text-slate-300 shrink-0" />
-                              <span>{trip.toLoc}</span>
-                            </div>
-
-                            <div className="mt-1 flex items-end justify-between gap-3">
-                              <span className="text-xs text-slate-400 italic">
-                                {trip.purpose || '-'}
-                              </span>
-                              <span className="text-xs font-bold text-slate-700">
-                                ₹{Number(trip.totalAmount || 0).toFixed(2)}
-                              </span>
-                            </div>
+                                <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => beginEditTrip(trip)}
+                                    className="min-h-10 rounded-lg bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteTrip(Number(trip.id))}
+                                    className="min-h-10 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1023,16 +1730,179 @@ export default function App() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-2 font-bold text-[#102a35]">Petrol rate</h3>
+              <p className="mb-4 text-sm leading-6 text-slate-500">
+                New trips use this reimbursement rate. Saved trips keep their original rate.
+              </p>
+              <label className="mb-3 block text-xs font-semibold text-slate-600">
+                Rate per kilometre (₹)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={rateInput}
+                  onChange={event => setRateInput(event.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={savePetrolRate}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <Save className="h-4 w-4" />
+                Save petrol rate
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-1 flex items-center gap-2 font-bold text-[#102a35]">
+                <UserRound className="h-4 w-4 text-teal-700" />
+                Visitors / clients
+              </h3>
+              <p className="mb-4 text-sm text-slate-500">Saved names appear as suggestions when entering a trip.</p>
+              <div className="mb-4 flex gap-2">
+                <input
+                  type="text"
+                  value={visitorInput}
+                  onChange={event => setVisitorInput(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      saveVisitor(visitorInput);
+                      setVisitorInput('');
+                    }
+                  }}
+                  placeholder="Add a visitor or client"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => { saveVisitor(visitorInput); setVisitorInput(''); }}
+                  aria-label="Add visitor or client"
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-teal-700 text-white hover:bg-teal-800"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+              {savedVisitors.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {savedVisitors.map(visitor => (
+                    <span key={visitor} className="inline-flex max-w-full items-center gap-1 rounded-full bg-teal-50 py-1 pl-3 pr-1 text-xs font-medium text-teal-900">
+                      <span className="max-w-[210px] truncate">{visitor}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeSavedName('visitor', visitor)}
+                        aria-label={`Remove ${visitor}`}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-teal-700 hover:bg-teal-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No saved clients yet. Names are also remembered when trips are saved.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-1 font-bold text-[#102a35]">Managers</h3>
+              <p className="mb-4 text-sm text-slate-500">Manage the manager suggestions shown on the trip form.</p>
+              <div className="mb-4 flex gap-2">
+                <input
+                  type="text"
+                  value={managerInput}
+                  onChange={event => setManagerInput(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      saveManager(managerInput);
+                      setManagerInput('');
+                    }
+                  }}
+                  placeholder="Add a manager"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => { saveManager(managerInput); setManagerInput(''); }}
+                  aria-label="Add manager"
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-teal-700 text-white hover:bg-teal-800"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+              {managers.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {managers.map(manager => (
+                    <span key={manager} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-xs font-medium text-slate-700">
+                      <span className="max-w-[210px] truncate">{manager}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeSavedName('manager', manager)}
+                        aria-label={`Remove ${manager}`}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No saved managers.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
+                <Database className="h-4 w-4 text-teal-700" />
+                Backup & restore
+              </h3>
+              <p className="mb-4 text-sm leading-6 text-slate-500">
+                Save your trips and settings to a backup file. Restore it after reinstalling or on another phone.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={createBackup}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
+                >
+                  <Database className="h-4 w-4" />
+                  Backup data
+                </button>
+                <button
+                  type="button"
+                  onClick={() => backupInputRef.current?.click()}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-sm font-bold text-teal-800 hover:bg-teal-100"
+                >
+                  <Upload className="h-4 w-4" />
+                  Restore data
+                </button>
+              </div>
+              <input
+                ref={backupInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={restoreBackup}
+                className="hidden"
+              />
+              <p className="mt-3 text-xs leading-5 text-slate-400">Restoring replaces the trips and settings currently saved on this phone.</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-bold text-[#102a35]">
                 App Info
               </h3>
 
               <ul className="space-y-3 text-sm text-slate-500">
-                <li>• App: Petrol Expenses Tracker</li>
+                <li>• App: Invictus Tracker · v1.0.0</li>
                 <li>• Routing Provider: OSRM Public API</li>
-                <li>• Rate / KM: Fixed at ₹5.00</li>
+                <li>• Rate / KM: {formatRupees(petrolRate)} (editable)</li>
                 <li>• Data Storage: Local Device Storage</li>
-                <li>• CSV Export: Android Filesystem + Share</li>
+                <li>• Exports: CSV and PDF · Android Share</li>
+                <li>• Backup: JSON file</li>
               </ul>
             </div>
           </div>
@@ -1081,5 +1951,6 @@ export default function App() {
     </div>
   );
 }
+
 
 
