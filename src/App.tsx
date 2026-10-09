@@ -3,6 +3,8 @@ import {
   MapPin,
   Clock,
   Navigation,
+  Menu,
+  X,
   History,
   Settings,
   Download,
@@ -23,6 +25,8 @@ import { Share } from '@capacitor/share';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
+  const [showReportsMenu, setShowReportsMenu] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [tripState, setTripState] = useState('idle');
   const [timer, setTimer] = useState(0);
   const timerRef = useRef<any>(null);
@@ -456,6 +460,8 @@ export default function App() {
     if (!recordedByName.trim()) {
       alert('Please set the name for this phone in Settings before adding a past trip.');
       setActiveTab('settings');
+      setShowReportsMenu(false);
+      setShowSettingsMenu(true);
       return;
     }
 
@@ -484,6 +490,8 @@ export default function App() {
     if (!recordedByName.trim()) {
       alert('Please set the name for this phone in Settings before adding a past trip.');
       setActiveTab('settings');
+      setShowReportsMenu(false);
+      setShowSettingsMenu(true);
       return;
     }
 
@@ -1490,209 +1498,24 @@ export default function App() {
         )}
 
         {activeTab === 'reports' && (
+          <>
           <div className="mx-auto max-w-md space-y-4 pb-5">
-            <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
-              <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
-                  History & totals
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold tracking-tight text-[#102a35]">Trip reports</h2>
+                <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                  {selectedMonth ? `Showing ${getMonthLabel(selectedMonth)}` : 'All trip dates'}
                 </p>
-                <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
-                  Trip reports
-                </h2>
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={exportCSV}
-                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-                >
-                  <Download className="h-4 w-4" />
-                  CSV
-                </button>
-                <button
-                  onClick={exportPDF}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-                >
-                  <FileText className="h-4 w-4" />
-                  PDF
-                </button>
-              </div>
-            </div>
-
-            {!showPastTripForm ? (
               <button
                 type="button"
-                onClick={openPastTripForm}
-                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                onClick={() => setShowReportsMenu(true)}
+                aria-label="Open reports menu"
+                aria-expanded={showReportsMenu}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
               >
-                <Plus className="h-4 w-4" />
-                Add a past trip
+                <Menu className="h-5 w-5" />
               </button>
-            ) : pastTripForm ? (
-              <form
-                onSubmit={event => {
-                  event.preventDefault();
-                  savePastTrip();
-                }}
-                className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <div>
-                  <h3 className="text-base font-bold text-[#102a35]">Add a past trip</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Enter the route and distance manually. Petrol uses your saved rate of {formatRupees(petrolRate)} per km.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    Trip date
-                    <input
-                      type="date"
-                      required
-                      max={getTripDateKey(new Date())}
-                      value={pastTripForm.date}
-                      onChange={event => setPastTripForm({ ...pastTripForm, date: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-500">
-                    Start time
-                    <input
-                      type="time"
-                      required
-                      value={pastTripForm.time}
-                      onChange={event => setPastTripForm({ ...pastTripForm, time: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    From
-                    <input
-                      required
-                      list="past-trip-locations"
-                      value={pastTripForm.fromLoc}
-                      onChange={event => setPastTripForm({ ...pastTripForm, fromLoc: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-500">
-                    To
-                    <input
-                      required
-                      list="past-trip-locations"
-                      value={pastTripForm.toLoc}
-                      onChange={event => setPastTripForm({ ...pastTripForm, toLoc: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    Visitor / client
-                    <input
-                      required
-                      list="past-trip-visitors"
-                      value={pastTripForm.visitor}
-                      onChange={event => setPastTripForm({ ...pastTripForm, visitor: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-500">
-                    Assigned person
-                    <input
-                      required
-                      list="past-trip-assigned-people"
-                      value={pastTripForm.assignedBy}
-                      onChange={event => setPastTripForm({ ...pastTripForm, assignedBy: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    Distance (km)
-                    <input
-                      type="number"
-                      required
-                      min="0.1"
-                      step="0.1"
-                      value={pastTripForm.totalKm}
-                      onChange={event => setPastTripForm({ ...pastTripForm, totalKm: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-500">
-                    Parking fee
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={pastTripForm.parkingFees}
-                      onChange={event => setPastTripForm({ ...pastTripForm, parkingFees: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                    />
-                  </label>
-                </div>
-
-                <label className="block text-xs font-semibold text-slate-500">
-                  Purpose
-                  <input
-                    value={pastTripForm.purpose}
-                    onChange={event => setPastTripForm({ ...pastTripForm, purpose: event.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
-                  />
-                </label>
-
-                <datalist id="past-trip-locations">
-                  {savedDestinations.map(destination => <option key={destination} value={destination} />)}
-                </datalist>
-                <datalist id="past-trip-visitors">
-                  {getAvailableVisitors().map(visitor => <option key={visitor} value={visitor} />)}
-                </datalist>
-                <datalist id="past-trip-assigned-people">
-                  {assignedPeople.map(person => <option key={person} value={person} />)}
-                </datalist>
-
-                <div className="flex gap-3 border-t border-slate-100 pt-4">
-                  <button
-                    type="button"
-                    onClick={cancelPastTrip}
-                    className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="brand-gradient-button flex-[2] rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-                  >
-                    Save past trip
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                Select Month
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold text-slate-700 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
-              >
-                <option value="">All Months</option>
-                {getAvailableMonths().map(month => (
-                  <option key={month} value={month}>{getMonthLabel(month)}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs leading-5 text-slate-400">
-                Reports and CSV / PDF exports use the selected month.
-              </p>
             </div>
 
             <div className="rounded-2xl brand-gradient-bg p-5 text-white shadow-lg shadow-slate-900/10">
@@ -1746,66 +1569,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-[#102a35]">Find trips</h3>
-                  <p className="mt-0.5 text-xs text-slate-400">Newest first</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearHistoryFilters}
-                  className="rounded-lg px-2 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
-                >
-                  Clear filters
-                </button>
-              </div>
-
-              <input
-                type="search"
-                value={reportSearch}
-                onChange={event => setReportSearch(event.target.value)}
-                placeholder="Search visitor, assigned person, place, purpose"
-                aria-label="Search trips"
-                className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-semibold text-slate-500">
-                  From date
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={event => setDateFrom(event.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
-                  />
-                </label>
-                <label className="text-xs font-semibold text-slate-500">
-                  To date
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={event => setDateTo(event.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
-                  />
-                </label>
-              </div>
-
-              <label className="mt-3 block text-xs font-semibold text-slate-500">
-                Visitor / client
-                <select
-                  value={filterVisitor}
-                  onChange={event => setFilterVisitor(event.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700"
-                >
-                  <option value="">All visitors / clients</option>
-                  {getAvailableVisitors().map(visitor => (
-                    <option key={visitor} value={visitor}>{visitor}</option>
-                  ))}
-                </select>
-              </label>
             </div>
 
             {trips.length === 0 ? (
@@ -2013,19 +1776,368 @@ export default function App() {
                 })
             )}
           </div>
+          {showReportsMenu && (
+            <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/40" role="presentation">
+              <button
+                type="button"
+                className="absolute inset-0 cursor-default"
+                onClick={() => setShowReportsMenu(false)}
+                aria-label="Close reports menu"
+              />
+              <aside
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reports-menu-title"
+                className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#f4f7f8] shadow-2xl"
+              >
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">More options</p>
+                    <h2 id="reports-menu-title" className="text-lg font-bold text-[#102a35]">Reports menu</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportsMenu(false)}
+                    aria-label="Close reports menu"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+                  History & totals
+                </p>
+                <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
+                  Trip reports
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={exportCSV}
+                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </button>
+                <button
+                  onClick={exportPDF}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <FileText className="h-4 w-4" />
+                  PDF
+                </button>
+              </div>
+            </div>
+            {!showPastTripForm ? (
+              <button
+                type="button"
+                onClick={openPastTripForm}
+                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <Plus className="h-4 w-4" />
+                Add a past trip
+              </button>
+            ) : pastTripForm ? (
+              <form
+                onSubmit={event => {
+                  event.preventDefault();
+                  savePastTrip();
+                }}
+                className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div>
+                  <h3 className="text-base font-bold text-[#102a35]">Add a past trip</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Enter the route and distance manually. Petrol uses your saved rate of {formatRupees(petrolRate)} per km.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Trip date
+                    <input
+                      type="date"
+                      required
+                      max={getTripDateKey(new Date())}
+                      value={pastTripForm.date}
+                      onChange={event => setPastTripForm({ ...pastTripForm, date: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Start time
+                    <input
+                      type="time"
+                      required
+                      value={pastTripForm.time}
+                      onChange={event => setPastTripForm({ ...pastTripForm, time: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    From
+                    <input
+                      required
+                      list="past-trip-locations"
+                      value={pastTripForm.fromLoc}
+                      onChange={event => setPastTripForm({ ...pastTripForm, fromLoc: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    To
+                    <input
+                      required
+                      list="past-trip-locations"
+                      value={pastTripForm.toLoc}
+                      onChange={event => setPastTripForm({ ...pastTripForm, toLoc: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Visitor / client
+                    <input
+                      required
+                      list="past-trip-visitors"
+                      value={pastTripForm.visitor}
+                      onChange={event => setPastTripForm({ ...pastTripForm, visitor: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Assigned person
+                    <input
+                      required
+                      list="past-trip-assigned-people"
+                      value={pastTripForm.assignedBy}
+                      onChange={event => setPastTripForm({ ...pastTripForm, assignedBy: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-500">
+                    Distance (km)
+                    <input
+                      type="number"
+                      required
+                      min="0.1"
+                      step="0.1"
+                      value={pastTripForm.totalKm}
+                      onChange={event => setPastTripForm({ ...pastTripForm, totalKm: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-500">
+                    Parking fee
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pastTripForm.parkingFees}
+                      onChange={event => setPastTripForm({ ...pastTripForm, parkingFees: event.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                    />
+                  </label>
+                </div>
+
+                <label className="block text-xs font-semibold text-slate-500">
+                  Purpose
+                  <input
+                    value={pastTripForm.purpose}
+                    onChange={event => setPastTripForm({ ...pastTripForm, purpose: event.target.value })}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                  />
+                </label>
+
+                <datalist id="past-trip-locations">
+                  {savedDestinations.map(destination => <option key={destination} value={destination} />)}
+                </datalist>
+                <datalist id="past-trip-visitors">
+                  {getAvailableVisitors().map(visitor => <option key={visitor} value={visitor} />)}
+                </datalist>
+                <datalist id="past-trip-assigned-people">
+                  {assignedPeople.map(person => <option key={person} value={person} />)}
+                </datalist>
+
+                <div className="flex gap-3 border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={cancelPastTrip}
+                    className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="brand-gradient-button flex-[2] rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  >
+                    Save past trip
+                  </button>
+                </div>
+              </form>
+            ) : null}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                Select Month
+              </label>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold text-slate-700 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+              >
+                <option value="">All Months</option>
+                {getAvailableMonths().map(month => (
+                  <option key={month} value={month}>{getMonthLabel(month)}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs leading-5 text-slate-400">
+                Reports and CSV / PDF exports use the selected month.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[#102a35]">Find trips</h3>
+                  <p className="mt-0.5 text-xs text-slate-400">Oldest first</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearHistoryFilters}
+                  className="rounded-lg px-2 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50"
+                >
+                  Clear filters
+                </button>
+              </div>
+
+              <input
+                type="search"
+                value={reportSearch}
+                onChange={event => setReportSearch(event.target.value)}
+                placeholder="Search visitor, assigned person, place, purpose"
+                aria-label="Search trips"
+                className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-slate-500">
+                  From date
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={event => setDateFrom(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500">
+                  To date
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={event => setDateTo(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-sm text-slate-700"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-3 block text-xs font-semibold text-slate-500">
+                Visitor / client
+                <select
+                  value={filterVisitor}
+                  onChange={event => setFilterVisitor(event.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700"
+                >
+                  <option value="">All visitors / clients</option>
+                  {getAvailableVisitors().map(visitor => (
+                    <option key={visitor} value={visitor}>{visitor}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+                </div>
+              </aside>
+            </div>
+          )}
+          </>
         )}
 
         {activeTab === 'settings' && (
-          <div className="mx-auto max-w-md space-y-4 pb-5">
-            <div className="mb-5">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
-                Preferences
-              </p>
-              <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
-                Settings
-              </h2>
+          <>
+            <div className="mx-auto max-w-md space-y-4 pb-5">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Preferences</p>
+                  <h2 className="text-xl font-bold tracking-tight text-[#102a35]">Settings</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsMenu(true)}
+                  aria-label="Open settings menu"
+                  aria-expanded={showSettingsMenu}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-800">
+                  <Settings className="h-7 w-7" />
+                </div>
+                <h3 className="text-base font-bold text-[#102a35]">Your settings are in one place</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Manage this phone’s name, office location, petrol rate, clients, backups, and app details from the menu.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsMenu(true)}
+                  className="brand-gradient-button mt-5 min-h-11 w-full rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  Open settings menu
+                </button>
+              </div>
             </div>
 
+            {showSettingsMenu && (
+              <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/40" role="presentation">
+                <button
+                  type="button"
+                  className="absolute inset-0 cursor-default"
+                  onClick={() => setShowSettingsMenu(false)}
+                  aria-label="Close settings menu"
+                />
+                <aside
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="settings-menu-title"
+                  className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#f4f7f8] shadow-2xl"
+                >
+                  <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">Preferences</p>
+                      <h2 id="settings-menu-title" className="text-lg font-bold text-[#102a35]">Settings menu</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsMenu(false)}
+                      aria-label="Close settings menu"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
                 <UserRound className="h-4 w-4 text-teal-700" />
@@ -2209,7 +2321,11 @@ export default function App() {
                 <li>• Backup: JSON file</li>
               </ul>
             </div>
-          </div>
+                  </div>
+                </aside>
+              </div>
+            )}
+          </>
         )}
       </main>
 
