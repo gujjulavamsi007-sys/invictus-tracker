@@ -14,10 +14,13 @@ import {
   AlertCircle,
   RefreshCw,
   FileText,
+  ChevronRight,
+  Fuel,
   Trash2,
   Upload,
   Database,
-  UserRound
+  UserRound,
+  UsersRound
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -1500,24 +1503,6 @@ export default function App() {
         {activeTab === 'reports' && (
           <>
           <div className="mx-auto max-w-md space-y-4 pb-5">
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="min-w-0">
-                <h2 className="text-xl font-bold tracking-tight text-[#102a35]">Trip reports</h2>
-                <p className="mt-1 truncate text-xs font-medium text-slate-500">
-                  {selectedMonth ? `Showing ${getMonthLabel(selectedMonth)}` : 'All trip dates'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowReportsMenu(true)}
-                aria-label="Open reports menu"
-                aria-expanded={showReportsMenu}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            </div>
-
             <div className="rounded-2xl brand-gradient-bg p-5 text-white shadow-lg shadow-slate-900/10">
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">
                 {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
@@ -1793,7 +1778,7 @@ export default function App() {
                 <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">More options</p>
-                    <h2 id="reports-menu-title" className="text-lg font-bold text-[#102a35]">Reports menu</h2>
+                    <h2 id="reports-menu-title" className="text-lg font-bold text-[#102a35]">Trips &amp; Reports</h2>
                   </div>
                   <button
                     type="button"
@@ -2097,7 +2082,7 @@ export default function App() {
                 </div>
                 <h3 className="text-base font-bold text-[#102a35]">Your settings are in one place</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Manage this phone’s name, office location, petrol rate, clients, backups, and app details from the menu.
+                  Manage this phone’s name, office location, Trips &amp; Reports, petrol rate, clients, backups, and app details from the menu.
                 </p>
                 <button
                   type="button"
@@ -2193,8 +2178,37 @@ export default function App() {
               </button>
             </div>
 
+            <button
+              type="button"
+              onClick={() => {
+                setShowSettingsMenu(false);
+                setActiveTab('reports');
+                setShowReportsMenu(true);
+              }}
+              aria-label="Open Trips and Reports"
+              className="w-full rounded-2xl border border-teal-200 bg-teal-50/70 p-4 text-left shadow-sm transition hover:bg-teal-50 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+            >
+              <span className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-teal-800">
+                    <FileText className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-bold text-[#102a35]">Trips &amp; Reports</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      Month filters, past trips, CSV and PDF
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-teal-800" />
+              </span>
+            </button>
+
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-2 font-bold text-[#102a35]">Petrol rate</h3>
+              <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
+                <Fuel className="h-4 w-4 text-teal-700" />
+                Petrol rate
+              </h3>
               <p className="mb-4 text-sm leading-6 text-slate-500">
                 New trips use this reimbursement rate. Saved trips keep their original rate.
               </p>
@@ -2222,7 +2236,7 @@ export default function App() {
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="mb-1 flex items-center gap-2 font-bold text-[#102a35]">
-                <UserRound className="h-4 w-4 text-teal-700" />
+                <UsersRound className="h-4 w-4 text-teal-700" />
                 Visitors / clients
               </h3>
               <p className="mb-4 text-sm text-slate-500">Saved names appear as suggestions when entering a trip.</p>
