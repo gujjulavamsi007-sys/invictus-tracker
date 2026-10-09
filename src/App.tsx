@@ -20,7 +20,8 @@ import {
   Upload,
   Database,
   UserRound,
-  UsersRound
+  UsersRound,
+  Heart
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -1164,21 +1165,23 @@ export default function App() {
 
   return (
     <div className="app-shell flex w-full flex-col overflow-hidden bg-[#f4f7f8] font-sans text-slate-900">
-      <header className="app-header z-10 shrink-0 brand-gradient-bg text-white shadow-sm">
-        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
-            <Navigation className="h-5 w-5 text-teal-300" />
+      {activeTab === 'settings' && (
+        <header className="app-header z-10 shrink-0 brand-gradient-bg text-white shadow-sm">
+          <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+              <Navigation className="h-5 w-5 text-teal-300" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300">
+                {recordedByName || 'PERSONAL TRIP TRACKER'}
+              </p>
+              <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                Trip & Petrol Expense Tracker
+              </h1>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300">
-              {recordedByName || 'PERSONAL TRIP TRACKER'}
-            </p>
-            <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
-              Trip & Petrol Expense Tracker
-            </h1>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
         {activeTab === 'tracker' && (
@@ -2077,20 +2080,13 @@ export default function App() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-800">
-                  <Settings className="h-7 w-7" />
+                <div className="mx-auto mb-4 flex h-[72px] w-[72px] items-center justify-center rounded-[22px] brand-gradient-bg shadow-[0_8px_24px_rgba(0,128,160,0.22)] ring-4 ring-teal-50">
+                  <Heart className="h-9 w-9 fill-white text-white drop-shadow-sm" />
                 </div>
-                <h3 className="text-base font-bold text-[#102a35]">Your settings are in one place</h3>
+                <h3 className="text-base font-bold text-[#102a35]">Everything you need, in one place</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   Manage this phone’s name, office location, Trips &amp; Reports, petrol rate, clients, backups, and app details from the menu.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsMenu(true)}
-                  className="brand-gradient-button mt-5 min-h-11 w-full rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-                >
-                  Open settings menu
-                </button>
               </div>
             </div>
 
@@ -2366,7 +2362,7 @@ export default function App() {
           }`}
         >
           <History className="h-5 w-5" />
-          <span className="text-[11px] font-semibold">Reports</span>
+          <span className="text-[11px] font-semibold">Summary</span>
         </button>
 
         <button
@@ -2385,6 +2381,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 
