@@ -1171,7 +1171,7 @@ export default function App() {
               {recordedByName || 'PERSONAL TRIP TRACKER'}
             </p>
             <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
-              Petrol Expenses
+              Trip & Petrol Expense Tracker
             </h1>
           </div>
         </div>
@@ -2313,7 +2313,7 @@ export default function App() {
               </h3>
 
               <ul className="space-y-3 text-sm text-slate-500">
-                <li>• App: Petrol Expenses · v1.0.0</li>
+                <li>• App: Trip & Petrol Expense Tracker · v1.0.0</li>
                 <li>• Routing Provider: OSRM Public API</li>
                 <li>• Rate / KM: {formatRupees(petrolRate)} (editable)</li>
                 <li>• Data Storage: Local Device Storage</li>
