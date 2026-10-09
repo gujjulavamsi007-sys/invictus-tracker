@@ -792,8 +792,8 @@ export default function App() {
     const csvContent = buildCSV(reportTrips);
     const exportDate = getTripDateKey(new Date());
     const fileName = selectedMonth
-      ? `Invictus_Trip_Report_${selectedMonth}_Exported_${exportDate}.csv`
-      : `Invictus_Trip_Report_All_Months_${exportDate}.csv`;
+      ? `Petrol_Expense_Report_${selectedMonth}_Exported_${exportDate}.csv`
+      : `Petrol_Expense_Report_All_Months_${exportDate}.csv`;
 
     try {
       if (Capacitor.isNativePlatform()) {
@@ -862,8 +862,8 @@ export default function App() {
     });
     const exportDate = getTripDateKey(new Date());
     const fileName = selectedMonth
-      ? `Invictus_Trip_Report_${selectedMonth}_Exported_${exportDate}.pdf`
-      : `Invictus_Trip_Report_All_Months_${exportDate}.pdf`;
+      ? `Petrol_Expense_Report_${selectedMonth}_Exported_${exportDate}.pdf`
+      : `Petrol_Expense_Report_All_Months_${exportDate}.pdf`;
     const rows = selectedTrips
       .slice()
       .sort(compareTripsByReportOrder)
@@ -946,7 +946,7 @@ export default function App() {
         title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
         subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
         footer: { fontSize: 8, color: '#64748b' },
-        reporter: { fontSize: 12, bold: true, color: '#087f9b', margin: [0, 6, 0, 0] },
+        reporter: { fontSize: 14, bold: true, color: '#075c7c', margin: [0, 6, 0, 0] },
         summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef9fb', alignment: 'center', lineHeight: 1.4 },
         summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#087f9b', alignment: 'center', lineHeight: 1.4 }
       },
@@ -973,7 +973,7 @@ export default function App() {
           directory: Directory.Documents
         });
         await Share.share({
-          title: 'Invictus Trip Report',
+          title: 'Petrol Expense Report',
           text: 'Trip and petrol expense report',
           url: fileUri.uri,
           dialogTitle: 'Share / Save PDF Report'
@@ -989,7 +989,7 @@ export default function App() {
 
   const createBackup = async () => {
     const backup = {
-      appId: 'invictus-tracker',
+      appId: 'petrol-expenses-tracker',
       formatVersion: 1,
       createdAt: new Date().toISOString(),
       data: {
@@ -1002,7 +1002,7 @@ export default function App() {
       }
     };
     const backupText = JSON.stringify(backup, null, 2);
-    const fileName = `Invictus_Tracker_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    const fileName = `Petrol_Tracker_Backup_${new Date().toISOString().slice(0, 10)}.json`;
 
     try {
       if (Capacitor.isNativePlatform()) {
@@ -1017,7 +1017,7 @@ export default function App() {
           directory: Directory.Documents
         });
         await Share.share({
-          title: 'Invictus Tracker Backup',
+          title: 'Petrol Tracker Backup',
           text: 'Backup of trips and app settings',
           url: fileUri.uri,
           dialogTitle: 'Save or share backup'
@@ -1053,7 +1053,7 @@ export default function App() {
       const backup = JSON.parse(await file.text());
       const data = backup?.data;
       if (
-        backup?.appId !== 'invictus-tracker' ||
+        (backup?.appId !== 'invictus-tracker' && backup?.appId !== 'petrol-expenses-tracker') ||
         backup?.formatVersion !== 1 ||
         !data ||
         !Array.isArray(data.trips) ||
@@ -1064,7 +1064,7 @@ export default function App() {
         !data.managers.every((item: unknown) => typeof item === 'string') ||
         !data.savedVisitors.every((item: unknown) => typeof item === 'string')
       ) {
-        alert('This is not a valid Invictus Tracker backup file.');
+        alert('This backup file is not for this app.');
         return;
       }
 
@@ -1168,7 +1168,7 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300">
-              INVICTUS · FIELD TRACKER
+              {recordedByName || 'PERSONAL TRIP TRACKER'}
             </p>
             <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
               Petrol Expenses
@@ -2313,7 +2313,7 @@ export default function App() {
               </h3>
 
               <ul className="space-y-3 text-sm text-slate-500">
-                <li>• App: Invictus Tracker · v1.0.0</li>
+                <li>• App: Petrol Expenses · v1.0.0</li>
                 <li>• Routing Provider: OSRM Public API</li>
                 <li>• Rate / KM: {formatRupees(petrolRate)} (editable)</li>
                 <li>• Data Storage: Local Device Storage</li>
