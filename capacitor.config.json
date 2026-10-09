@@ -1,6 +1,6 @@
 {
   "appId": "com.invictus.tracker",
-  "appName": "Invictus Track",
+  "appName": "Trip & Petrol Expense Tracker",
   "webDir": "dist",
   "bundledWebRuntime": false
 }
