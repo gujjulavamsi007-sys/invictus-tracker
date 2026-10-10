@@ -8,7 +8,6 @@ import {
   History,
   Settings,
   Download,
-  Bike,
   Plus,
   Save,
   AlertCircle,
@@ -48,12 +47,29 @@ export default function App() {
   const [showReportsMenu, setShowReportsMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [recoveredTripDraft] = useState(() => readTripDraft(localStorage));
+  const [showWelcomeSetup, setShowWelcomeSetup] = useState(() => {
+    try {
+      if (localStorage.getItem('tripExpenseOnboardingComplete') === 'true') return false;
+      const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
+      const hasExistingSetup = Boolean(
+        localStorage.getItem('invictusRecordedBy') ||
+        localStorage.getItem('invictusOffice') ||
+        localStorage.getItem('invictusRate') ||
+        (Array.isArray(savedTrips) && savedTrips.length > 0)
+      );
+      return !hasExistingSetup && !recoveredTripDraft;
+    } catch {
+      return false;
+    }
+  });
   const [showRecoveredTripNotice, setShowRecoveredTripNotice] = useState(Boolean(recoveredTripDraft));
   const [tripState, setTripState] = useState(recoveredTripDraft?.phase || 'idle');
   const [timer, setTimer] = useState(0);
   const timerRef = useRef<any>(null);
 
   const [officeLocation, setOfficeLocation] = useState<any>(null);
+  const [officeSetupMessage, setOfficeSetupMessage] = useState('');
+  const [isSavingOfficeLocation, setIsSavingOfficeLocation] = useState(false);
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
   const [recordedByName, setRecordedByName] = useState('');
@@ -260,14 +276,21 @@ export default function App() {
     }
   };
 
-  const saveOfficeGPS = async () => {
+  const saveOfficeGPS = async (showAlert = true) => {
+    setIsSavingOfficeLocation(true);
     try {
       const coords = await getGPSLocation();
       setOfficeLocation(coords);
       localStorage.setItem('invictusOffice', JSON.stringify(coords));
-      alert('Office GPS location saved successfully!');
+      setOfficeSetupMessage('Office location saved. You can change it later in Settings.');
+      if (showAlert) alert('Office GPS location saved successfully!');
+      return true;
     } catch (err) {
-      alert('Failed to get location for Office.');
+      setOfficeSetupMessage('Could not get your location. Check location permission, or set this later in Settings.');
+      if (showAlert) alert('Failed to get location for Office.');
+      return false;
+    } finally {
+      setIsSavingOfficeLocation(false);
     }
   };
 
@@ -330,6 +353,34 @@ export default function App() {
     setRecordedByInput(normalizedName);
     localStorage.setItem('invictusRecordedBy', normalizedName);
     alert('Name saved on this phone. New trips will include it.');
+  };
+
+  const completeWelcomeSetup = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedName = recordedByInput.trim();
+    const nextRate = Number(rateInput);
+    if (!normalizedName) {
+      alert('Enter the name of the person using this phone.');
+      return;
+    }
+    if (!rateInput.trim() || !Number.isFinite(nextRate) || nextRate < 0) {
+      alert('Enter a valid petrol rate of ₹0 or more per kilometre.');
+      return;
+    }
+
+    setRecordedByName(normalizedName);
+    setRecordedByInput(normalizedName);
+    setPetrolRate(nextRate);
+    setRateInput(String(nextRate));
+    localStorage.setItem('invictusRecordedBy', normalizedName);
+    localStorage.setItem('invictusRate', String(nextRate));
+    localStorage.setItem('tripExpenseOnboardingComplete', 'true');
+    setShowWelcomeSetup(false);
+  };
+
+  const skipWelcomeSetup = () => {
+    localStorage.setItem('tripExpenseOnboardingComplete', 'true');
+    setShowWelcomeSetup(false);
   };
 
   const finalizeTrip = () => {
@@ -575,16 +626,19 @@ export default function App() {
 
   const now = new Date();
   const todayKey = getTripDateKey(now);
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const todayTrips = trips.filter(trip => {
     const tripDate = getTripDate(trip);
     return tripDate ? getTripDateKey(tripDate) === todayKey : false;
   });
-  const monthTrips = trips.filter(trip => getTripMonthKey(trip) === currentMonthKey);
   const todayKm = sumTripKm(todayTrips);
-  const todayPetrol = sumPetrolAmount(todayTrips);
-  const monthKm = sumTripKm(monthTrips);
-  const monthPetrol = sumPetrolAmount(monthTrips);
+  const todayTotal = sumTotalAmount(todayTrips);
+  const recentTrips = [...trips].sort(compareTripsByReportOrder).reverse().slice(0, 2);
+  const todayLabel = now.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+  const greetingName = recordedByName.trim().split(/\s+/)[0] || 'there';
 
   const getAvailableMonths = (): string[] =>
     Array.from(new Set(trips.map((trip: any) => String(getTripMonthKey(trip))).filter(Boolean) as string[])).sort().reverse();
@@ -1106,6 +1160,109 @@ export default function App() {
 
   return (
     <div className="app-shell flex w-full flex-col overflow-hidden bg-[#f4f7f8] font-sans text-slate-900">
+      {showWelcomeSetup && (
+        <section className="fixed inset-0 z-[100] overflow-y-auto bg-[#f4f7f8] px-4 pb-8 pt-[max(24px,env(safe-area-inset-top))]" aria-labelledby="welcome-setup-title">
+          <div className="mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-md flex-col">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl brand-gradient-bg text-white shadow-md shadow-teal-900/15">
+                <Navigation className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Welcome</p>
+                <p className="text-sm font-bold leading-5 text-[#102a35]">Trip &amp; Petrol Expense Tracker</p>
+              </div>
+            </div>
+
+            <div className="mt-9">
+              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-teal-700">Quick setup · 1 of 1</p>
+              <h1 id="welcome-setup-title" className="mt-2 text-[28px] font-extrabold leading-[1.12] tracking-tight text-[#102a35]">
+                Let’s get you set up.
+              </h1>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                Add a couple of details so your trips and expense reports are ready to go.
+              </p>
+            </div>
+
+            <form id="welcome-setup-form" onSubmit={completeWelcomeSetup} className="mt-6 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <label className="block text-xs font-semibold text-slate-600">
+                Name for this phone
+                <input
+                  type="text"
+                  required
+                  maxLength={80}
+                  autoComplete="name"
+                  value={recordedByInput}
+                  onChange={event => setRecordedByInput(event.target.value)}
+                  placeholder="Enter your name"
+                  className={inputClass + ' mt-1.5'}
+                />
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Petrol reimbursement rate
+                <span className="relative mt-1.5 block">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    required
+                    value={rateInput}
+                    onChange={event => setRateInput(event.target.value)}
+                    className={inputClass + ' pr-20'}
+                    aria-label="Petrol reimbursement rate per kilometre in rupees"
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-slate-400">per km</span>
+                </span>
+              </label>
+            </form>
+
+            <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#102a35]">
+                <MapPin className="h-4 w-4 text-teal-700" />
+                Office location <span className="text-xs font-medium text-slate-400">Optional</span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Save your office location to prefill the start point for your first trip of the day.
+              </p>
+              {officeLocation && (
+                <p className="mt-2 text-xs font-semibold text-emerald-800">Office location saved on this phone.</p>
+              )}
+              {officeSetupMessage && (
+                <p role="status" className="mt-2 text-xs leading-5 text-slate-600">{officeSetupMessage}</p>
+              )}
+              <button
+                type="button"
+                disabled={isSavingOfficeLocation}
+                onClick={() => { void saveOfficeGPS(false); }}
+                className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-bold text-teal-800 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-60"
+              >
+                <MapPin className="h-4 w-4" />
+                {isSavingOfficeLocation ? 'Finding location…' : officeLocation ? 'Update with GPS' : 'Use current location'}
+              </button>
+            </div>
+
+            <div className="mt-auto pt-6">
+              <button
+                type="submit"
+                form="welcome-setup-form"
+                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-lg shadow-teal-900/15 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                Save and continue <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={skipWelcomeSetup}
+                className="mt-2 min-h-10 w-full rounded-xl px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-white"
+              >
+                Set this up later
+              </button>
+              <p className="mt-1 text-center text-[10px] leading-4 text-slate-400">
+                Your name and rate are saved on this phone. Change them anytime in Settings.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
       {activeTab === 'settings' && (
         <header className="app-header z-10 shrink-0 brand-gradient-bg text-white shadow-sm">
           <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
@@ -1126,7 +1283,7 @@ export default function App() {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
         {activeTab === 'tracker' && (
-          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 pb-5">
+          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-start gap-4 pb-5">
             {showRecoveredTripNotice && (
               <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
                 <p>Your unfinished trip was recovered on this device. You can continue tracking or finish entering its details.</p>
@@ -1141,93 +1298,115 @@ export default function App() {
             )}
             {tripState === 'idle' && (
               <>
-                <section
-                  aria-labelledby="dashboard-title"
-                  className="rounded-[24px] brand-gradient-bg p-4 text-white shadow-lg shadow-slate-900/10 sm:p-5"
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-teal-200">
-                        At a glance
-                      </p>
-                      <h2 id="dashboard-title" className="mt-0.5 text-lg font-bold tracking-tight">
-                        Dashboard
-                      </h2>
+                <header className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] brand-gradient-bg text-white shadow-sm">
+                      <Navigation className="h-5 w-5" />
                     </div>
-                    <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-slate-200 ring-1 ring-white/10">
-                      {trips.length} {trips.length === 1 ? 'trip' : 'trips'} total
-                    </span>
+                    <div className="min-w-0">
+                      <h1 className="max-w-[245px] text-[13px] font-extrabold leading-4 tracking-tight text-[#102a35]">
+                        Trip &amp; Petrol Expense Tracker
+                      </h1>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Trips, made simple</p>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('settings')}
+                    aria-label="Open settings"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-teal-700/15"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </header>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        Today · KM
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
-                        {todayKm.toFixed(1)} <span className="text-xs font-medium text-slate-300">km</span>
-                      </p>
+                <section aria-labelledby="dashboard-title" className="pt-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-teal-700">{todayLabel}</p>
+                  <h2 id="dashboard-title" className="mt-1 text-[21px] font-extrabold tracking-tight text-[#102a35]">
+                    Ready for your next trip?
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">Hello, {greetingName}. Start tracking when you set off.</p>
+                </section>
+
+                <section className="rounded-[22px] brand-gradient-bg p-4 text-white shadow-lg shadow-slate-900/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/10">
+                      <MapPin className="h-5 w-5 text-white" />
                     </div>
-                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        Today · Petrol
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums">{formatRupees(todayPetrol)}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold">Trip tracking is ready</p>
+                      <p className="mt-0.5 text-[10px] leading-4 text-white/75">GPS will capture your route while you travel.</p>
                     </div>
-                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        This month · KM
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
-                        {monthKm.toFixed(1)} <span className="text-xs font-medium text-slate-300">km</span>
-                      </p>
+                  </div>
+                  <button
+                    onClick={handleStartTrip}
+                    className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-teal-800 shadow-sm transition hover:bg-teal-50 focus:outline-none focus:ring-4 focus:ring-white/30 active:scale-[0.99]"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Start trip
+                  </button>
+                  <p className="mt-2 text-center text-[10px] text-white/75">
+                    {recordedByName ? `Recorded on this phone as ${recordedByName}.` : 'Add the phone name in Settings before tracking.'}
+                  </p>
+                </section>
+
+                <section aria-labelledby="today-summary-title">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <h3 id="today-summary-title" className="text-sm font-bold text-[#102a35]">Today at a glance</h3>
+                    <button type="button" onClick={() => setActiveTab('reports')} className="text-[10px] font-bold text-teal-800">View reports</button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Trips</p>
+                      <p className="mt-1 text-lg font-extrabold tabular-nums text-[#123d53]">{todayTrips.length}</p>
                     </div>
-                    <div className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                        This month · Petrol
-                      </p>
-                      <p className="mt-1 text-xl font-bold tabular-nums">{formatRupees(monthPetrol)}</p>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Distance</p>
+                      <p className="mt-1 whitespace-nowrap text-lg font-extrabold tabular-nums text-[#123d53]">{todayKm.toFixed(1)} <span className="text-[10px] font-semibold">km</span></p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Expenses</p>
+                      <p className="mt-1 whitespace-nowrap text-lg font-extrabold tabular-nums text-[#123d53]">{formatRupees(todayTotal)}</p>
                     </div>
                   </div>
                 </section>
 
-                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-                  <div className="mb-7 flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Trip tracking
-                    </span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      Ready
-                    </span>
+                <section aria-labelledby="recent-trips-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <h3 id="recent-trips-title" className="text-sm font-bold text-[#102a35]">Recent trips</h3>
+                    <button type="button" onClick={() => setActiveTab('reports')} className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-800">
+                      See all <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
-                    <Bike className="h-8 w-8" />
-                  </div>
-
-                  <div className="mb-7">
-                    <h2 className="text-2xl font-bold tracking-tight text-[#102a35] sm:text-[28px]">
-                      Ready for your next trip?
-                    </h2>
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                      Start when you set off. Your trip time and route will be captured automatically.
-                    </p>
-                    <p className="mt-2 text-xs font-medium text-slate-500">
-                      {recordedByName
-                        ? `New trips will be recorded as ${recordedByName}.`
-                        : 'Set this phone’s name in Settings before starting a trip.'}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleStartTrip}
-                    className="brand-gradient-button flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-5 py-4 text-base font-bold text-white shadow-lg shadow-teal-900/15 transition focus:outline-none focus:ring-4 focus:ring-teal-700/20 active:scale-[0.99]"
-                  >
-                    <MapPin className="h-5 w-5" />
-                    Start trip
-                  </button>
-                </div>
+                  {recentTrips.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {recentTrips.map(trip => {
+                        const tripDate = getTripDate(trip);
+                        const startTime = Number(trip.startTime);
+                        const tripTime = Number.isFinite(startTime) && startTime > 0
+                          ? new Date(startTime).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+                          : '';
+                        const tripDateLabel = tripDate
+                          ? tripDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                          : String(trip.date || 'Date unavailable');
+                        return (
+                          <div key={trip.id} className="flex items-center gap-3 px-4 py-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800">
+                              <History className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-bold text-[#102a35]">{trip.fromLoc || 'Start'} <span className="text-slate-400">→</span> {trip.toLoc || 'Destination'}</p>
+                              <p className="mt-1 text-[10px] text-slate-500">{tripDateLabel}{tripTime ? ` · ${tripTime}` : ''} · {Number(trip.totalKm || 0).toFixed(1)} km</p>
+                            </div>
+                            <p className="shrink-0 text-xs font-extrabold tabular-nums text-[#123d53]">{formatRupees(getTripTotalAmount(trip))}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="px-4 py-5 text-xs leading-5 text-slate-500">No trips recorded yet. Your recent trips will appear here.</p>
+                  )}
+                </section>
               </>
             )}
 
@@ -1461,9 +1640,11 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'reports' && (
+        {(activeTab === 'reports' || activeTab === 'trips') && (
           <>
           <div className="mx-auto max-w-md space-y-4 pb-5">
+            {activeTab === 'reports' && (
+              <>
             <div className="rounded-2xl brand-gradient-bg p-5 text-white shadow-lg shadow-slate-900/10">
               <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">
                 {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
@@ -1556,6 +1737,35 @@ export default function App() {
                 <p className="px-4 py-5 text-sm text-slate-500">Monthly comparisons appear after trips are recorded.</p>
               )}
             </section>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('trips')}
+              className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-teal-100 bg-white px-4 py-3 text-left text-sm font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
+            >
+              <span>View recorded trips</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+              </>
+            )}
+
+            {activeTab === 'trips' && (
+              <>
+                <section className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-700">Trip history</p>
+                    <h2 className="mt-0.5 text-lg font-bold tracking-tight text-[#102a35]">Your trips</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportsMenu(true)}
+                    aria-label="Open trip filters and export options"
+                    className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-teal-50 px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-100"
+                  >
+                    <Menu className="h-4 w-4" />
+                    Filters &amp; more
+                  </button>
+                </section>
 
             {trips.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
@@ -1760,6 +1970,8 @@ export default function App() {
                     </div>
                   );
                 })
+            )}
+              </>
             )}
           </div>
           {showReportsMenu && (
@@ -2337,8 +2549,9 @@ export default function App() {
         )}
       </main>
 
-      <nav className="pb-safe z-20 shrink-0 border-t border-slate-200 bg-white/95 px-4 pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
-        <div className="mx-auto grid w-full max-w-md grid-cols-3 gap-2">
+      {!showWelcomeSetup && (
+      <nav className="pb-safe z-20 shrink-0 border-t border-slate-200 bg-white/95 px-3 pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+        <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-1">
         <button
           onClick={() => setActiveTab('tracker')}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-3 transition ${
@@ -2348,7 +2561,19 @@ export default function App() {
           }`}
         >
           <Navigation className="h-5 w-5" />
-          <span className="text-[11px] font-semibold">Track</span>
+          <span className="text-[11px] font-semibold">Home</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('trips')}
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 transition ${
+            activeTab === 'trips'
+              ? 'bg-teal-50 text-teal-800'
+              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+          }`}
+        >
+          <History className="h-5 w-5" />
+          <span className="text-[10px] font-semibold">Trips</span>
         </button>
 
         <button
@@ -2359,8 +2584,8 @@ export default function App() {
               : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
           }`}
         >
-          <History className="h-5 w-5" />
-          <span className="text-[11px] font-semibold">Summary</span>
+          <FileText className="h-5 w-5" />
+          <span className="text-[10px] font-semibold">Reports</span>
         </button>
 
         <button
@@ -2376,6 +2601,7 @@ export default function App() {
         </button>
         </div>
       </nav>
+      )}
 
       {pendingBackupRestore && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
