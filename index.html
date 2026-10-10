@@ -39,16 +39,12 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #eaf2f4; }
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #eaf4ef; }
       #root { height: 100%; }
       .app-shell {
         height: 100vh;
-        background-color: #eaf2f4;
-        background-image:
-          radial-gradient(circle, rgba(8, 127, 155, 0.16) 1.35px, transparent 1.6px),
-          radial-gradient(ellipse at 12% 8%, rgba(255, 255, 255, 0.5), transparent 44%),
-          radial-gradient(ellipse at 86% 92%, rgba(8, 127, 155, 0.07), transparent 38%);
-        background-size: 18px 18px, 100% 100%, 100% 100%;
+        background-color: #eaf4ef;
+        background-image: none;
       }
       .app-header { padding-top: env(safe-area-inset-top, 0px); }
       .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
@@ -59,7 +55,7 @@
       @supports (height: 100dvh) { .app-shell { height: 100dvh; } }
     </style>
   </head>
-  <body class="bg-[#eaf2f4]">
+  <body class="bg-[#eaf4ef]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

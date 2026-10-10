@@ -1158,9 +1158,9 @@ export default function App() {
     'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
 
   return (
-    <div className="app-shell flex w-full flex-col overflow-hidden bg-[#eaf2f4] font-sans text-slate-900">
+    <div className="app-shell flex w-full flex-col overflow-hidden bg-[#eaf4ef] font-sans text-slate-900">
       {showWelcomeSetup && (
-        <section className="fixed inset-0 z-[100] overflow-y-auto bg-[#eaf2f4] px-4 pb-8 pt-[max(24px,env(safe-area-inset-top))]" aria-labelledby="welcome-setup-title">
+        <section className="fixed inset-0 z-[100] overflow-y-auto bg-[#eaf4ef] px-4 pb-8 pt-[max(24px,env(safe-area-inset-top))]" aria-labelledby="welcome-setup-title">
           <div className="mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-md flex-col">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl brand-gradient-bg text-white shadow-md shadow-teal-900/15">
@@ -1316,7 +1316,13 @@ export default function App() {
                   <h2 id="dashboard-title" className="mt-1 text-[21px] font-extrabold tracking-tight text-[#102a35]">
                     Ready for your next trip?
                   </h2>
-                  <p className="mt-1 text-xs text-slate-500">Hello, {greetingName}. Start tracking when you set off.</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                    Hello,
+                    <span className="inline-flex rounded-full border border-teal-200 bg-white px-2 py-0.5 font-bold text-teal-800 shadow-sm">
+                      {greetingName}
+                    </span>
+                    . Start tracking when you set off.
+                  </p>
                 </section>
 
                 <section className="rounded-[22px] brand-gradient-bg p-4 text-white shadow-lg shadow-slate-900/10">
@@ -1336,9 +1342,6 @@ export default function App() {
                     <MapPin className="h-4 w-4" />
                     Start trip
                   </button>
-                  <p className="mt-2 text-center text-[10px] text-white/75">
-                    {recordedByName ? `Recorded on this phone as ${recordedByName}.` : 'Add the phone name in Settings before tracking.'}
-                  </p>
                 </section>
 
                 <section aria-labelledby="today-summary-title">
@@ -1916,7 +1919,7 @@ export default function App() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="reports-menu-title"
-                className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf2f4] shadow-2xl"
+                className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf4ef] shadow-2xl"
               >
                 <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                   <div>
@@ -2242,7 +2245,7 @@ export default function App() {
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="settings-menu-title"
-                  className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf2f4] shadow-2xl"
+                  className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf4ef] shadow-2xl"
                 >
                   <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                     <div>
