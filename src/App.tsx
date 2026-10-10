@@ -19,10 +19,9 @@ import {
   Upload,
   Database,
   UserRound,
-  UsersRound,
-  Heart
+  UsersRound
 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import {
@@ -41,6 +40,104 @@ import {
   restoreBackupToStorage,
   validateBackup
 } from './reportLogic.mjs';
+
+const buildOpenStreetMapEmbedUrl = (coords: { lat: number; lon: number }) => {
+  const latitudePadding = 0.005;
+  const longitudePadding = 0.008;
+  const bbox = [
+    coords.lon - longitudePadding,
+    coords.lat - latitudePadding,
+    coords.lon + longitudePadding,
+    coords.lat + latitudePadding
+  ].map(value => value.toFixed(6)).join(',');
+  const params = new URLSearchParams({
+    bbox,
+    layer: 'mapnik',
+    marker: `${coords.lat},${coords.lon}`
+  });
+  return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
+};
+
+type SharedMapLocation = {
+  text: string;
+  url: string | null;
+  coords: { lat: number; lon: number } | null;
+};
+
+const isValidMapPoint = (lat: number, lon: number) =>
+  Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+
+const parseSharedMapLocation = (text: string): SharedMapLocation | null => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const urlMatch = trimmed.match(/https?:\/\/[^\s<>]+/i);
+  const rawUrl = urlMatch?.[0]?.replace(/[),.;!?]+$/, '') || null;
+  let safeUrl: string | null = null;
+  let url: URL | null = null;
+  if (rawUrl) {
+    try {
+      url = new URL(rawUrl);
+      const isMapLink = url.hostname.toLowerCase().includes('map') || /\/maps?(?:\/|$)/i.test(url.pathname);
+      if (isMapLink && (url.protocol === 'https:' || url.protocol === 'http:')) {
+        safeUrl = url.toString();
+      }
+    } catch {
+      // Keep processing plain coordinates even if the accompanying link is malformed.
+    }
+  }
+
+  const coordinatePatterns = [
+    /geo:\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/i,
+    /@(-?\d{1,2}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/,
+    /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /(?:[?&](?:q|query|ll|daddr|destination|center)=)(-?\d{1,2}(?:\.\d+)?)(?:%2c|,|\+|%20)(-?\d{1,3}(?:\.\d+)?)/i,
+    /^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
+  ];
+
+  let coords: { lat: number; lon: number } | null = null;
+  for (const pattern of coordinatePatterns) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      const lat = Number(match[1]);
+      const lon = Number(match[2]);
+      if (isValidMapPoint(lat, lon)) {
+        coords = { lat, lon };
+        break;
+      }
+    }
+  }
+
+  if (!coords && url) {
+    const latitudeText = url.searchParams.get('mlat') || url.searchParams.get('lat');
+    const longitudeText = url.searchParams.get('mlon') || url.searchParams.get('lon');
+    const latitude = Number(latitudeText);
+    const longitude = Number(longitudeText);
+    if (latitudeText && longitudeText && isValidMapPoint(latitude, longitude)) {
+      coords = { lat: latitude, lon: longitude };
+    }
+
+    if (!coords) {
+      const osmHash = url.hash.match(/map=\d+\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/);
+      if (osmHash) {
+        const lat = Number(osmHash[1]);
+        const lon = Number(osmHash[2]);
+        if (isValidMapPoint(lat, lon)) coords = { lat, lon };
+      }
+    }
+  }
+
+  if (!coords && !safeUrl) return null;
+  return { text: trimmed, url: safeUrl, coords };
+};
+
+const SharedLocation = registerPlugin<{
+  getPendingShare(): Promise<{ text?: string }>;
+  addListener(
+    eventName: 'sharedText',
+    listenerFunc: (event: { text?: string }) => void
+  ): Promise<{ remove: () => Promise<void> }>;
+}>('SharedLocation');
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
@@ -68,6 +165,11 @@ export default function App() {
   const timerRef = useRef<any>(null);
 
   const [officeLocation, setOfficeLocation] = useState<any>(null);
+  const [homeMapLocation, setHomeMapLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [sharedMapLocation, setSharedMapLocation] = useState<SharedMapLocation | null>(null);
+  const [mapDestinationInput, setMapDestinationInput] = useState('');
+  const [isLocatingHomeMap, setIsLocatingHomeMap] = useState(false);
+  const [homeMapMessage, setHomeMapMessage] = useState('');
   const [officeSetupMessage, setOfficeSetupMessage] = useState('');
   const [isSavingOfficeLocation, setIsSavingOfficeLocation] = useState(false);
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
@@ -93,6 +195,28 @@ export default function App() {
   const [currentTrip, setCurrentTrip] = useState(recoveredTripDraft?.trip || createEmptyTrip());
   const [pendingBackupRestore, setPendingBackupRestore] = useState<any>(null);
 
+  const receiveSharedMapLocation = (text: string) => {
+    const location = parseSharedMapLocation(text);
+    if (!location) {
+      setHomeMapMessage('Enter coordinates like 17.3850, 78.4867 or paste a map link.');
+      return;
+    }
+
+    setSharedMapLocation(location);
+    setMapDestinationInput('');
+    setActiveTab('tracker');
+    setHomeMapMessage(
+      location.coords
+        ? 'Location received · map preview is ready'
+        : 'Map link received · open it to view the shared place'
+    );
+  };
+
+  const submitMapDestination = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    receiveSharedMapLocation(mapDestinationInput);
+  };
+
   useEffect(() => {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
     const savedRecordedByName = localStorage.getItem('invictusRecordedBy') || '';
@@ -117,6 +241,43 @@ export default function App() {
     setSavedVisitors(savedVisitors);
     setPetrolRate(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5);
     setRateInput(String(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5));
+  }, []);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+
+    let mounted = true;
+    let listener: { remove: () => Promise<void> } | null = null;
+
+    const takePendingShare = async () => {
+      try {
+        const result = await SharedLocation.getPendingShare();
+        if (mounted && result?.text) receiveSharedMapLocation(result.text);
+      } catch {
+        // The browser preview has no native share receiver; Android provides this bridge.
+      }
+    };
+
+    void SharedLocation.addListener('sharedText', event => {
+      if (mounted && event?.text) receiveSharedMapLocation(event.text);
+    }).then(handle => {
+      listener = handle;
+      if (!mounted) void handle.remove();
+    }).catch(() => {});
+
+    void takePendingShare();
+    const checkPendingShare = () => {
+      if (document.visibilityState === 'visible') void takePendingShare();
+    };
+    window.addEventListener('focus', checkPendingShare);
+    document.addEventListener('visibilitychange', checkPendingShare);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('focus', checkPendingShare);
+      document.removeEventListener('visibilitychange', checkPendingShare);
+      if (listener) void listener.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -183,6 +344,25 @@ export default function App() {
     });
   };
 
+  const showHomeMap = async () => {
+    setIsLocatingHomeMap(true);
+    setHomeMapMessage('');
+    try {
+      const coords = await getGPSLocation();
+      setHomeMapLocation(coords);
+      setHomeMapMessage('Showing your current area');
+    } catch {
+      if (officeLocation && Number.isFinite(Number(officeLocation.lat)) && Number.isFinite(Number(officeLocation.lon))) {
+        setHomeMapLocation({ lat: Number(officeLocation.lat), lon: Number(officeLocation.lon) });
+        setHomeMapMessage('Could not get your current location. Showing your saved office area.');
+      } else {
+        setHomeMapMessage('Allow location access and try again to show your area.');
+      }
+    } finally {
+      setIsLocatingHomeMap(false);
+    }
+  };
+
   const getRoadDistanceOSRM = async (start: any, end: any) => {
     try {
       const baseUrl = atob(
@@ -215,6 +395,8 @@ export default function App() {
     try {
       const coords = await getGPSLocation();
       const now = new Date();
+      setHomeMapLocation(coords);
+      setHomeMapMessage('Trip started here · tap Refresh to update your location');
 
       const todayString = now.toLocaleDateString('en-GB');
       const todaysTrips = trips.filter(
@@ -247,6 +429,8 @@ export default function App() {
     try {
       const coords = await getGPSLocation();
       const now = new Date();
+      setHomeMapLocation(coords);
+      setHomeMapMessage('Trip ended near here');
 
       let distanceKm = 0;
 
@@ -1156,6 +1340,10 @@ export default function App() {
 
   const inputClass =
     'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
+  const mapPreviewLocation = sharedMapLocation?.coords || homeMapLocation;
+  const mapDestinationUrl = sharedMapLocation?.coords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${sharedMapLocation.coords.lat},${sharedMapLocation.coords.lon}`)}${homeMapLocation ? `&origin=${encodeURIComponent(`${homeMapLocation.lat},${homeMapLocation.lon}`)}` : ''}&travelmode=driving`
+    : sharedMapLocation?.url;
 
   return (
     <div className="app-shell flex w-full flex-col overflow-hidden bg-[#eaf4ef] font-sans text-slate-900">
@@ -1404,6 +1592,107 @@ export default function App() {
                   End trip
                 </button>
               </div>
+            )}
+
+            {(tripState === 'idle' || tripState === 'tracking') && (
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="home-map-title">
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div>
+                    <h3 id="home-map-title" className="text-sm font-bold text-[#102a35]">Nearby map</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {sharedMapLocation?.coords
+                        ? 'Showing your selected destination'
+                        : tripState === 'tracking'
+                          ? 'Trip in progress · refresh to update GPS'
+                          : 'Share a WhatsApp location or view your area'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={showHomeMap}
+                    disabled={isLocatingHomeMap}
+                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-teal-50 px-3 text-xs font-semibold text-teal-800 transition hover:bg-teal-100 disabled:opacity-60"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    {isLocatingHomeMap ? 'Locating…' : homeMapLocation ? 'Refresh' : 'Locate me'}
+                  </button>
+                </div>
+                {sharedMapLocation && (
+                  <div className="mx-3 mb-3 flex items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-teal-900">{sharedMapLocation.coords ? 'Destination ready' : 'Shared map link'}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-teal-800">
+                        {sharedMapLocation.coords
+                          ? `${sharedMapLocation.coords.lat.toFixed(5)}, ${sharedMapLocation.coords.lon.toFixed(5)}`
+                          : 'This link will open in your maps app'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {mapDestinationUrl && (
+                        <a
+                          href={mapDestinationUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg bg-white px-2.5 py-2 text-[10px] font-bold text-teal-800 shadow-sm"
+                        >
+                          {sharedMapLocation.coords ? 'Directions' : 'Open map'}
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="Clear selected destination"
+                        onClick={() => setSharedMapLocation(null)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-teal-800 hover:bg-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {mapPreviewLocation ? (
+                  <iframe
+                    title={sharedMapLocation?.coords ? 'Map of the selected destination' : 'Map of your current area'}
+                    src={buildOpenStreetMapEmbedUrl(mapPreviewLocation)}
+                    className="block h-44 w-full border-0"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-44 flex-col items-center justify-center gap-2 bg-slate-50 px-5 text-center text-slate-500">
+                    <Navigation className="h-6 w-6 text-teal-700" />
+                    <p className="text-xs">Share a location from WhatsApp, or tap “Locate me” to see your area.</p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2 px-4 py-2">
+                  <p role="status" className="min-w-0 text-[10px] text-slate-500">{homeMapMessage}</p>
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-[10px] text-slate-500 underline underline-offset-2"
+                  >
+                    © OpenStreetMap
+                  </a>
+                </div>
+                <details className="border-t border-slate-100 px-4 py-2.5">
+                  <summary className="cursor-pointer text-[11px] font-semibold text-teal-800">Enter a destination manually</summary>
+                  <form onSubmit={submitMapDestination} className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={mapDestinationInput}
+                      onChange={event => setMapDestinationInput(event.target.value)}
+                      placeholder="Map link or 17.3850, 78.4867"
+                      aria-label="Map link or destination coordinates"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10"
+                    />
+                    <button
+                      type="submit"
+                      className="shrink-0 rounded-lg brand-gradient-button px-3 py-2 text-xs font-bold text-white"
+                    >
+                      Show
+                    </button>
+                  </form>
+                </details>
+              </section>
             )}
 
             {tripState === 'saving' && (
@@ -2206,31 +2495,56 @@ export default function App() {
         {activeTab === 'settings' && (
           <>
             <div className="mx-auto max-w-md space-y-4 pb-5">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div>
                   <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Preferences</p>
                   <h2 className="text-xl font-bold tracking-tight text-[#102a35]">Settings</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsMenu(true)}
-                  aria-label="Open settings menu"
-                  aria-expanded={showSettingsMenu}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                <div className="mx-auto mb-4 flex h-[72px] w-[72px] items-center justify-center rounded-[22px] brand-gradient-bg shadow-[0_8px_24px_rgba(0,128,160,0.22)] ring-4 ring-teal-50">
-                  <Heart className="h-9 w-9 fill-white text-white drop-shadow-sm" />
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="settings-overview-title">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">At a glance</p>
+                  <h3 id="settings-overview-title" className="mt-0.5 text-base font-bold text-[#102a35]">Your tracker</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">Current setup and saved records</p>
                 </div>
-                <h3 className="text-base font-bold text-[#102a35]">Everything you need, in one place</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Manage this phone’s name, office location, Trips &amp; Reports, petrol rate, clients, backups, and app details from the menu.
-                </p>
-              </div>
+                <div className="divide-y divide-slate-100 px-4">
+                  <div className="flex items-center justify-between gap-3 py-4">
+                    <span className="flex items-center gap-2 text-sm text-slate-600">
+                      <UserRound className="h-4 w-4 text-teal-700" /> Phone name
+                    </span>
+                    <span className="max-w-[55%] truncate text-right text-sm font-semibold text-[#102a35]">{recordedByName || 'Not set'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-4">
+                    <span className="flex items-center gap-2 text-sm text-slate-600">
+                      <MapPin className="h-4 w-4 text-teal-700" /> Office location
+                    </span>
+                    <span className="text-right text-sm font-semibold text-[#102a35]">{officeLocation ? 'Set' : 'Not set'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-4">
+                    <span className="flex items-center gap-2 text-sm text-slate-600">
+                      <Fuel className="h-4 w-4 text-teal-700" /> Petrol rate
+                    </span>
+                    <span className="text-right text-sm font-semibold text-[#102a35]">{formatRupees(petrolRate)} / km</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-4">
+                    <span className="flex items-center gap-2 text-sm text-slate-600">
+                      <History className="h-4 w-4 text-teal-700" /> Saved trips
+                    </span>
+                    <span className="text-right text-sm font-semibold text-[#102a35]">{trips.length}</span>
+                  </div>
+                </div>
+                <p className="px-4 pb-3 text-[11px] leading-5 text-slate-500">Use Manage settings below to change preferences, manage backups, or view app details.</p>
+              </section>
+              <button
+                type="button"
+                onClick={() => setShowSettingsMenu(true)}
+                aria-expanded={showSettingsMenu}
+                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <Menu className="h-4 w-4" />
+                Manage settings
+              </button>
             </div>
 
             {showSettingsMenu && (
