@@ -632,7 +632,6 @@ export default function App() {
   });
   const todayKm = sumTripKm(todayTrips);
   const todayTotal = sumTotalAmount(todayTrips);
-  const recentTrips = [...trips].sort(compareTripsByReportOrder).reverse().slice(0, 2);
   const todayLabel = now.toLocaleDateString('en-IN', {
     weekday: 'long',
     day: 'numeric',
@@ -1159,9 +1158,9 @@ export default function App() {
     'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
 
   return (
-    <div className="app-shell flex w-full flex-col overflow-hidden bg-[#f4f7f8] font-sans text-slate-900">
+    <div className="app-shell flex w-full flex-col overflow-hidden bg-[#eaf2f4] font-sans text-slate-900">
       {showWelcomeSetup && (
-        <section className="fixed inset-0 z-[100] overflow-y-auto bg-[#f4f7f8] px-4 pb-8 pt-[max(24px,env(safe-area-inset-top))]" aria-labelledby="welcome-setup-title">
+        <section className="fixed inset-0 z-[100] overflow-y-auto bg-[#eaf2f4] px-4 pb-8 pt-[max(24px,env(safe-area-inset-top))]" aria-labelledby="welcome-setup-title">
           <div className="mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-md flex-col">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl brand-gradient-bg text-white shadow-md shadow-teal-900/15">
@@ -1310,14 +1309,6 @@ export default function App() {
                       <p className="mt-0.5 text-[10px] text-slate-500">Trips, made simple</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('settings')}
-                    aria-label="Open settings"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-teal-700/15"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </button>
                 </header>
 
                 <section aria-labelledby="dashboard-title" className="pt-1">
@@ -1353,7 +1344,6 @@ export default function App() {
                 <section aria-labelledby="today-summary-title">
                   <div className="mb-2 flex items-center justify-between px-1">
                     <h3 id="today-summary-title" className="text-sm font-bold text-[#102a35]">Today at a glance</h3>
-                    <button type="button" onClick={() => setActiveTab('reports')} className="text-[10px] font-bold text-teal-800">View reports</button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
@@ -1371,42 +1361,6 @@ export default function App() {
                   </div>
                 </section>
 
-                <section aria-labelledby="recent-trips-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                    <h3 id="recent-trips-title" className="text-sm font-bold text-[#102a35]">Recent trips</h3>
-                    <button type="button" onClick={() => setActiveTab('reports')} className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-800">
-                      See all <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  {recentTrips.length > 0 ? (
-                    <div className="divide-y divide-slate-100">
-                      {recentTrips.map(trip => {
-                        const tripDate = getTripDate(trip);
-                        const startTime = Number(trip.startTime);
-                        const tripTime = Number.isFinite(startTime) && startTime > 0
-                          ? new Date(startTime).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
-                          : '';
-                        const tripDateLabel = tripDate
-                          ? tripDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                          : String(trip.date || 'Date unavailable');
-                        return (
-                          <div key={trip.id} className="flex items-center gap-3 px-4 py-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800">
-                              <History className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-bold text-[#102a35]">{trip.fromLoc || 'Start'} <span className="text-slate-400">→</span> {trip.toLoc || 'Destination'}</p>
-                              <p className="mt-1 text-[10px] text-slate-500">{tripDateLabel}{tripTime ? ` · ${tripTime}` : ''} · {Number(trip.totalKm || 0).toFixed(1)} km</p>
-                            </div>
-                            <p className="shrink-0 text-xs font-extrabold tabular-nums text-[#123d53]">{formatRupees(getTripTotalAmount(trip))}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="px-4 py-5 text-xs leading-5 text-slate-500">No trips recorded yet. Your recent trips will appear here.</p>
-                  )}
-                </section>
               </>
             )}
 
@@ -1738,35 +1692,11 @@ export default function App() {
               )}
             </section>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('trips')}
-              className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-teal-100 bg-white px-4 py-3 text-left text-sm font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
-            >
-              <span>View recorded trips</span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
               </>
             )}
 
             {activeTab === 'trips' && (
               <>
-                <section className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-700">Trip history</p>
-                    <h2 className="mt-0.5 text-lg font-bold tracking-tight text-[#102a35]">Your trips</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowReportsMenu(true)}
-                    aria-label="Open trip filters and export options"
-                    className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-teal-50 px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-100"
-                  >
-                    <Menu className="h-4 w-4" />
-                    Filters &amp; more
-                  </button>
-                </section>
-
             {trips.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
                 No trips recorded yet.
@@ -1986,7 +1916,7 @@ export default function App() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="reports-menu-title"
-                className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#f4f7f8] shadow-2xl"
+                className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf2f4] shadow-2xl"
               >
                 <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                   <div>
@@ -2312,7 +2242,7 @@ export default function App() {
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="settings-menu-title"
-                  className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#f4f7f8] shadow-2xl"
+                  className="relative z-10 flex h-full w-[min(92vw,430px)] flex-col bg-[#eaf2f4] shadow-2xl"
                 >
                   <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                     <div>
