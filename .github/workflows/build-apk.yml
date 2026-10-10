@@ -37,6 +37,98 @@ jobs:
         run: |
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
+      - name: Add WhatsApp map sharing support
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          manifest_path = Path("android/app/src/main/AndroidManifest.xml")
+          manifest = manifest_path.read_text()
+          activity_pattern = re.compile(
+              r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*>)(.*?)(</activity>)',
+              re.DOTALL
+          )
+          match = activity_pattern.search(manifest)
+          if not match:
+              raise SystemExit("Could not find the generated MainActivity in AndroidManifest.xml")
+
+          activity_body = match.group(2)
+          if 'android.intent.action.SEND' not in activity_body:
+              share_filter = '''
+                  <intent-filter>
+                      <action android:name="android.intent.action.SEND" />
+                      <category android:name="android.intent.category.DEFAULT" />
+                      <data android:mimeType="text/plain" />
+                  </intent-filter>
+          '''
+              activity_body += share_filter
+              manifest = manifest[:match.start(2)] + activity_body + manifest[match.end(2):]
+              manifest_path.write_text(manifest)
+
+          package_dir = Path("android/app/src/main/java/com/invictus/tracker")
+          package_dir.mkdir(parents=True, exist_ok=True)
+          plugin_path = package_dir / "SharedLocationPlugin.java"
+          plugin_path.write_text('''package com.invictus.tracker;
+
+          import android.content.Intent;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          @CapacitorPlugin(name = "SharedLocation")
+          public class SharedLocationPlugin extends Plugin {
+              private JSObject pendingShare;
+
+              @Override
+              public void load() {
+                  pendingShare = extractSharedText(getActivity().getIntent());
+              }
+
+              @PluginMethod
+              public void getPendingShare(PluginCall call) {
+                  JSObject result = pendingShare;
+                  pendingShare = null;
+                  call.resolve(result == null ? new JSObject() : result);
+              }
+
+              @Override
+              protected void handleOnNewIntent(Intent intent) {
+                  JSObject shared = extractSharedText(intent);
+                  if (shared == null) return;
+                  pendingShare = shared;
+                  notifyListeners("sharedText", shared, true);
+              }
+
+              private JSObject extractSharedText(Intent intent) {
+                  if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return null;
+                  String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+                  if (text == null || text.trim().isEmpty()) return null;
+                  JSObject result = new JSObject();
+                  result.put("text", text.trim());
+                  return result;
+              }
+          }
+          ''')
+
+          main_activity_path = package_dir / "MainActivity.java"
+          main_activity_path.write_text('''package com.invictus.tracker;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(SharedLocationPlugin.class);
+                  super.onCreate(savedInstanceState);
+              }
+          }
+          ''')
+          PY
+
       - name: Configure Android Signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
