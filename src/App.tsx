@@ -868,12 +868,16 @@ export default function App() {
     const fileName = selectedMonth
       ? `Petrol_Expense_Report_${selectedMonth}_Exported_${exportDate}.pdf`
       : `Petrol_Expense_Report_All_Months_${exportDate}.pdf`;
+    const formatReportDate = (date: string) => {
+      const isoDate = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return isoDate ? `${isoDate[3]}-${isoDate[2]}-${isoDate[1]}` : date;
+    };
     const rows = selectedTrips
       .slice()
       .sort(compareTripsByReportOrder)
       .map((trip, index) => [
         String(index + 1),
-        trip.date || '-',
+        formatReportDate(trip.date || '-'),
         trip.visitor || '-',
         trip.assignedBy || '-',
         `${trip.fromLoc || '-'} TO ${trip.toLoc || '-'}`,
@@ -884,77 +888,167 @@ export default function App() {
         formatRupees(getTripTotalAmount(trip))
       ]);
 
+    const reportIconPaths: Record<string, string> = {
+      road: '<path d="M9 3 6 21M15 3l3 18M12 4v2m0 4v2m0 4v2m0 4v1"/>',
+      pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+      fuel: '<path d="M5 21V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v17M5 8h10M8 5h4M5 21h12"/><path d="m15 8 3 2v7a2 2 0 0 0 4 0V9l-2-2"/>',
+      parking: '<path d="M7 21V3h6a6 6 0 0 1 0 12H7"/>',
+      coins: '<ellipse cx="9" cy="6" rx="6" ry="3"/><path d="M3 6v4c0 1.7 2.7 3 6 3h1M3 10v4c0 1.7 2.7 3 6 3"/><ellipse cx="16" cy="14" rx="5" ry="2.5"/><path d="M11 14v4c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4"/>',
+      calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+      person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
+      users: '<path d="M16 21v-2a5 5 0 0 0-10 0v2M11 4.2a3.5 3.5 0 1 0 0 7"/><path d="M17 11a3.5 3.5 0 1 0-1-6.8M19 14a5 5 0 0 1 3 4.6V21"/>',
+      route: '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18h3a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/>',
+      document: '<path d="M6 2h8l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+      total: '<ellipse cx="9" cy="6" rx="6" ry="3"/><path d="M3 6v4c0 1.7 2.7 3 6 3s6-1.3 6-3V6M3 10v4c0 1.7 2.7 3 6 3h2"/><ellipse cx="17" cy="15" rx="4" ry="2"/><path d="M13 15v4c0 1.1 1.8 2 4 2s4-.9 4-2v-4"/>'
+    };
+    const makeReportIcon = (name: string, stroke: string, background?: string) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${background ? `<circle cx="12" cy="12" r="11.5" fill="${background}"/>` : ''}<g fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${reportIconPaths[name]}</g></svg>`;
+    const makeSummaryBadge = (name: string, background: string, stroke: string) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26" fill="${background}"/><g transform="translate(16 16)" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${reportIconPaths[name]}</g></svg>`;
+    const summaryBadgeColors: Record<string, string> = {
+      road: '#B9DFFC', pin: '#AFE4D7', fuel: '#FFD19A', parking: '#D0C1FF', coins: '#06798C'
+    };
+    const summaryCard = (label: string, value: string, icon: string, fillColor: string, accent: string, highlight = false) => ({
+      columns: [
+        { svg: makeSummaryBadge(icon, summaryBadgeColors[icon], highlight ? '#FFFFFF' : accent), width: 48, height: 48 },
+        {
+          stack: [
+            { text: label, style: highlight ? 'summaryTotalLabel' : 'summaryLabel' },
+            { text: value, style: highlight ? 'summaryTotalValue' : 'summaryValue' },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 15, y2: 0, lineWidth: 1.8, lineColor: highlight ? '#52D2D4' : accent }], margin: [0, 2, 0, 0] }
+          ],
+          width: '*'
+        }
+      ],
+      columnGap: 6,
+      fillColor,
+      margin: [7, 7, 7, 7]
+    });
+    const tableHeaderCell = (label: string, icon: string, fillColor = '#0C3558') => ({
+      columns: [
+        { svg: makeReportIcon(icon, '#FFFFFF'), width: 12, height: 12 },
+        { text: label, style: 'tableHeader' }
+      ],
+      columnGap: 4,
+      fillColor
+    });
+
     const documentDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [28, 38, 28, 38],
-      footer: {
-        text: `Generated ${generatedOn}`,
-        alignment: 'left',
-        margin: [28, 0, 0, 16],
-        style: 'footer'
-      },
+      pageMargins: [22, 20, 22, 62],
+      footer: (currentPage: number, pageCount: number) => ({
+        stack: [
+          {
+            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 797, y2: 0, lineWidth: 1.1, lineColor: '#0D8798' }],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              {
+                columns: [
+                  { svg: makeReportIcon('calendar', '#0D6C9E'), width: 13, height: 13 },
+                  { text: `Generated ${generatedOn}`, style: 'footer' }
+                ],
+                columnGap: 5
+              },
+              { text: `Page ${currentPage} of ${pageCount}`, alignment: 'right', style: 'footerPage' }
+            ]
+          }
+        ],
+        margin: [22, 0, 22, 12]
+      }),
       content: [
-        { text: 'Petrol Expense Report', style: 'title' },
-        ...(recordedByName ? [{ text: `Name: ${recordedByName}`, style: 'reporter' }] : []),
+        {
+          text: [
+            { text: 'Petrol Expense ', color: '#0C3558' },
+            { text: 'Report', color: '#078B96' }
+          ],
+          style: 'title'
+        },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 74, y2: 0, lineWidth: 1.4, lineColor: '#08A4B0' }], margin: [0, 2, 0, 4] },
+        ...(recordedByName ? [{ text: [{ text: 'Name: ' }, { text: recordedByName, bold: true }], style: 'reporter' }] : []),
         { text: `${selectedMonth ? getMonthLabel(selectedMonth) : 'All months'}`, style: 'subtitle' },
         {
-          margin: [0, 14, 0, 14],
+          margin: [0, 9, 0, 9],
           table: {
             widths: ['*', '*', '*', '*', '*'],
             body: [[
-              { text: `TRIPS\n${selectedTrips.length}`, style: 'summary' },
-              { text: `TOTAL KM\n${totalKm.toFixed(1)}`, style: 'summary' },
-              { text: `PETROL AMOUNT\n${formatRupees(totalPetrol)}`, style: 'summary' },
-              { text: `PARKING FEE\n${formatRupees(totalParking)}`, style: 'summary' },
-              { text: `GRAND TOTAL\n${formatRupees(grandTotal)}`, style: 'summaryHighlight' }
+              summaryCard('TRIPS', String(selectedTrips.length), 'road', '#EAF5FB', '#1177C5'),
+              summaryCard('TOTAL KM', totalKm.toFixed(1), 'pin', '#E8F7F4', '#008D79'),
+              summaryCard('PETROL AMOUNT', formatRupees(totalPetrol), 'fuel', '#FFF2E5', '#E97D0A'),
+              summaryCard('PARKING FEE', formatRupees(totalParking), 'parking', '#F2EEFF', '#7040D5'),
+              summaryCard('GRAND TOTAL', formatRupees(grandTotal), 'coins', '#087F94', '#FFFFFF', true)
             ]]
           },
           layout: {
             hLineWidth: () => 0,
-            vLineWidth: () => 5,
-            vLineColor: () => '#ffffff',
-            paddingLeft: () => 8,
-            paddingRight: () => 8,
-            paddingTop: () => 9,
-            paddingBottom: () => 9
+            vLineWidth: () => 6,
+            vLineColor: () => '#FFFFFF',
+            paddingLeft: () => 0,
+            paddingRight: () => 0,
+            paddingTop: () => 0,
+            paddingBottom: () => 0
           }
         },
         {
+          margin: [0, 0, 0, 0],
           table: {
-            headerRows: 1,
-            widths: [22, 50, 74, 64, '*', '*', 36, 56, 52, 58],
+            headerRows: 0,
+            widths: [17, 50, 88, 78, 132, 116, 31, 72, 67, 64],
             body: [[
-              'No.', 'Date', 'Visitor / Client', 'Assigned Person', 'Route', 'Purpose',
-              'KM', 'Petrol Amount', 'Parking Fee', 'Total'
-            ], ...rows, [
-              { text: 'TOTAL', colSpan: 6, alignment: 'right', bold: true },
+              { text: 'No.', style: 'tableHeader' },
+              tableHeaderCell('Date', 'calendar'),
+              tableHeaderCell('Visitor / Client', 'person'),
+              tableHeaderCell('Assigned Person', 'users'),
+              tableHeaderCell('Route', 'route'),
+              tableHeaderCell('Purpose', 'document'),
+              tableHeaderCell('KM', 'road'),
+              tableHeaderCell('Petrol Amount', 'fuel'),
+              tableHeaderCell('Parking Fee', 'parking'),
+              tableHeaderCell('Total', 'total', '#087F86')
+            ], ...rows.map(row => row.map((text, columnIndex) => ({
+              text,
+              alignment: columnIndex === 0 || columnIndex >= 6 ? 'center' : 'left'
+            }))), [
+              { text: 'TOTAL', colSpan: 6, alignment: 'right', bold: true, color: '#0C3558' },
               {}, {}, {}, {}, {},
-              { text: totalKm.toFixed(1), bold: true },
-              { text: formatRupees(totalPetrol), bold: true },
-              { text: formatRupees(totalParking), bold: true },
-              { text: formatRupees(grandTotal), bold: true }
+              { text: totalKm.toFixed(1), bold: true, color: '#0C3558', alignment: 'center' },
+              { text: formatRupees(totalPetrol), bold: true, color: '#0C3558', alignment: 'center' },
+              { text: formatRupees(totalParking), bold: true, color: '#0C3558', alignment: 'center' },
+              { text: formatRupees(grandTotal), bold: true, color: '#087F86', alignment: 'center' }
             ]]
           },
           layout: {
-            hLineColor: () => '#dbe4e8',
-            vLineWidth: () => 0,
+            fillColor: (rowIndex: number) => {
+              if (rowIndex === 0) return '#0C3558';
+              if (rowIndex === rows.length + 1) return '#E8F3F6';
+              return rowIndex % 2 === 0 ? '#EFF5F9' : '#FFFFFF';
+            },
+            hLineColor: (lineIndex: number) => lineIndex === 1 ? '#0D8798' : '#D4E1EA',
+            hLineWidth: (lineIndex: number) => lineIndex === 1 ? 1.1 : 0.55,
+            vLineColor: () => '#D4E1EA',
+            vLineWidth: () => 0.55,
             paddingLeft: () => 4,
             paddingRight: () => 4,
-            paddingTop: () => 5,
-            paddingBottom: () => 5
+            paddingTop: () => 3.5,
+            paddingBottom: () => 3.5
           }
         }
       ],
       styles: {
-        title: { fontSize: 20, bold: true, color: '#102a35', margin: [0, 4, 0, 0] },
-        subtitle: { fontSize: 9, color: '#64748b', margin: [0, 5, 0, 0] },
-        footer: { fontSize: 8, color: '#64748b' },
-        reporter: { fontSize: 14, bold: true, color: '#075c7c', margin: [0, 6, 0, 0] },
-        summary: { fontSize: 9, bold: true, color: '#102a35', fillColor: '#eef9fb', alignment: 'center', lineHeight: 1.4 },
-        summaryHighlight: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#087f9b', alignment: 'center', lineHeight: 1.4 }
+        title: { fontSize: 24, bold: true, margin: [0, 0, 0, 0] },
+        subtitle: { fontSize: 9, color: '#0C3558', margin: [0, 2, 0, 0] },
+        reporter: { fontSize: 10, color: '#0C3558', margin: [0, 1, 0, 0] },
+        footer: { fontSize: 8, color: '#0C3558' },
+        footerPage: { fontSize: 8, bold: true, color: '#0C3558' },
+        summaryLabel: { fontSize: 7.4, bold: true, color: '#173C5A', margin: [0, 1, 0, 2] },
+        summaryValue: { fontSize: 13, bold: true, color: '#0C3558' },
+        summaryTotalLabel: { fontSize: 7.4, bold: true, color: '#FFFFFF', margin: [0, 1, 0, 2] },
+        summaryTotalValue: { fontSize: 13, bold: true, color: '#FFFFFF' },
+        tableHeader: { fontSize: 7.4, bold: true, color: '#FFFFFF' }
       },
-      defaultStyle: { font: 'Roboto', fontSize: 7, color: '#334155' }
+      defaultStyle: { font: 'Roboto', fontSize: 8.2, color: '#123553' }
     };
 
     try {
