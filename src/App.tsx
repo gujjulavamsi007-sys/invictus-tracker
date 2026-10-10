@@ -26,12 +26,30 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import {
+  buildEditedTripList,
+  buildMonthlyInsights,
+  buildPdfTableDefinition,
+  buildTripRecord,
+  compareTripsByReportOrder,
+  createEmptyTrip,
+  filterHistoryTrips,
+  getTripDate,
+  getTripDateKey,
+  getTripMonthKey,
+  persistTripDraft,
+  readTripDraft,
+  restoreBackupToStorage,
+  validateBackup
+} from './reportLogic.mjs';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
   const [showReportsMenu, setShowReportsMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [tripState, setTripState] = useState('idle');
+  const [recoveredTripDraft] = useState(() => readTripDraft(localStorage));
+  const [showRecoveredTripNotice, setShowRecoveredTripNotice] = useState(Boolean(recoveredTripDraft));
+  const [tripState, setTripState] = useState(recoveredTripDraft?.phase || 'idle');
   const [timer, setTimer] = useState(0);
   const timerRef = useRef<any>(null);
 
@@ -56,20 +74,8 @@ export default function App() {
   const [pastTripForm, setPastTripForm] = useState<any>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [currentTrip, setCurrentTrip] = useState({
-    startCoords: null as any,
-    endCoords: null as any,
-    startTime: null as number | null,
-    endTime: null as number | null,
-    actualKm: 0,
-    fromLoc: '',
-    toLoc: '',
-    visitor: '',
-    assignedBy: '',
-    recordedBy: '',
-    parkingFees: 0,
-    purpose: ''
-  });
+  const [currentTrip, setCurrentTrip] = useState(recoveredTripDraft?.trip || createEmptyTrip());
+  const [pendingBackupRestore, setPendingBackupRestore] = useState<any>(null);
 
   useEffect(() => {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
@@ -99,7 +105,12 @@ export default function App() {
 
   useEffect(() => {
     if (tripState === 'tracking') {
-      timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
+      const updateElapsed = () => {
+        const startedAt = Number(currentTrip.startTime) || Date.now();
+        setTimer(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+      };
+      updateElapsed();
+      timerRef.current = setInterval(updateElapsed, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
       if (tripState === 'idle') setTimer(0);
@@ -108,7 +119,23 @@ export default function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [tripState]);
+  }, [tripState, currentTrip.startTime]);
+
+  useEffect(() => {
+    try {
+      persistTripDraft(localStorage, tripState, currentTrip);
+    } catch (error) {
+      console.error('Could not save the in-progress trip draft', error);
+    }
+  }, [tripState, currentTrip]);
+
+  const clearTripDraft = () => {
+    try {
+      persistTripDraft(localStorage, 'idle', createEmptyTrip());
+    } catch (error) {
+      console.error('Could not clear the in-progress trip draft', error);
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -314,48 +341,18 @@ export default function App() {
     saveDestination(currentTrip.toLoc);
     saveAssignedPerson(currentTrip.assignedBy);
 
-    const km = parseFloat(currentTrip.actualKm.toString()) || 0;
-    const parking = parseFloat(currentTrip.parkingFees.toString()) || 0;
-
-    const tripRecord = {
-      id: Date.now(),
-      date: new Date(currentTrip.startTime!).toLocaleDateString('en-GB').replace(/\//g, '-'),
-      visitor: currentTrip.visitor,
-      assignedBy: currentTrip.assignedBy,
-      recordedBy: currentTrip.recordedBy || recordedByName,
-      fromLoc: currentTrip.fromLoc,
-      toLoc: currentTrip.toLoc,
-      totalKm: km,
-      ratePerKm: petrolRate,
-      petrolCharges: km * petrolRate,
-      parkingFees: parking,
-      totalAmount: km * petrolRate + parking,
-      purpose: currentTrip.purpose,
-      startTime: currentTrip.startTime,
-      endTime: currentTrip.endTime
-    };
+    const tripRecord = buildTripRecord(currentTrip, recordedByName, petrolRate);
 
     saveVisitor(currentTrip.visitor);
     const newTrips = [...trips, tripRecord];
     setTrips(newTrips);
     localStorage.setItem('invictusTrips', JSON.stringify(newTrips));
+    clearTripDraft();
 
-    setCurrentTrip({
-      startCoords: null,
-      endCoords: null,
-      startTime: null,
-      endTime: null,
-      actualKm: 0,
-      fromLoc: '',
-      toLoc: '',
-      visitor: '',
-      assignedBy: '',
-      recordedBy: '',
-      parkingFees: 0,
-      purpose: ''
-    });
+    setCurrentTrip(createEmptyTrip());
 
     setTripState('idle');
+    setShowRecoveredTripNotice(false);
     setActiveTab('reports');
   };
 
@@ -412,16 +409,6 @@ export default function App() {
     const originalTrip = trips.find(trip => Number(trip.id) === tripId);
     if (!originalTrip) return;
 
-    const originalTripDate = getTripDate(originalTrip);
-    const originalStartTime = Number(originalTrip.startTime) || originalTripDate?.getTime() || selectedDay.getTime();
-    const originalStart = new Date(originalStartTime);
-    selectedDay.setHours(
-      originalStart.getHours(),
-      originalStart.getMinutes(),
-      originalStart.getSeconds(),
-      originalStart.getMilliseconds()
-    );
-
     const totalKm = Number(editingTripForm.totalKm);
     const parkingFees = Number(editingTripForm.parkingFees);
     if (!Number.isFinite(totalKm) || totalKm < 0 || !Number.isFinite(parkingFees) || parkingFees < 0) {
@@ -429,34 +416,14 @@ export default function App() {
       return;
     }
 
-    const ratePerKm = Number(originalTrip.ratePerKm ?? petrolRate);
-    const petrolCharges = totalKm * ratePerKm;
-    const dateShift = selectedDay.getTime() - originalStartTime;
-    const updatedTrips = trips.map(trip => {
-      if (Number(trip.id) !== tripId) return trip;
-      return {
-        ...trip,
-        date: selectedDay.toLocaleDateString('en-GB').replace(/\//g, '-'),
-        startTime: selectedDay.getTime(),
-        endTime: trip.endTime ? Number(trip.endTime) + dateShift : trip.endTime,
-        visitor: editingTripForm.visitor.trim(),
-        assignedBy: editingTripForm.assignedBy.trim(),
-        fromLoc: editingTripForm.fromLoc.trim(),
-        toLoc: editingTripForm.toLoc.trim(),
-        totalKm,
-        ratePerKm,
-        petrolCharges,
-        parkingFees,
-        totalAmount: petrolCharges + parkingFees,
-        purpose: editingTripForm.purpose.trim()
-      };
-    });
+    const edited = buildEditedTripList(trips, tripId, editingTripForm, petrolRate);
+    if (!edited) return;
 
-    saveVisitor(editingTripForm.visitor);
-    saveAssignedPerson(editingTripForm.assignedBy);
-    saveDestination(editingTripForm.toLoc);
-    setTrips(updatedTrips);
-    localStorage.setItem('invictusTrips', JSON.stringify(updatedTrips));
+    saveVisitor(edited.updatedTrip.visitor);
+    saveAssignedPerson(edited.updatedTrip.assignedBy);
+    saveDestination(edited.updatedTrip.toLoc);
+    setTrips(edited.trips);
+    localStorage.setItem('invictusTrips', JSON.stringify(edited.trips));
     cancelEditTrip();
   };
 
@@ -582,55 +549,6 @@ export default function App() {
   };
 
 
-  const getTripMonthKey = (trip: any) => {
-    if (trip.startTime) {
-      const d = new Date(trip.startTime);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }
-    const parts = String(trip.date || '').split('-');
-    return parts.length === 3 ? `${parts[2]}-${parts[1]}` : '';
-  };
-
-  const getTripDate = (trip: any) => {
-    if (trip.startTime) {
-      const tripDate = new Date(trip.startTime);
-      return Number.isNaN(tripDate.getTime()) ? null : tripDate;
-    }
-
-    const parts = String(trip.date || '').split('-').map(Number);
-    if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) {
-      return null;
-    }
-
-    const [day, month, year] = parts;
-    const tripDate = new Date(year, month - 1, day);
-    if (
-      tripDate.getFullYear() !== year ||
-      tripDate.getMonth() !== month - 1 ||
-      tripDate.getDate() !== day
-    ) {
-      return null;
-    }
-
-    return tripDate;
-  };
-
-  const getTripDateKey = (date: Date) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-  const compareTripsByReportOrder = (a: any, b: any) => {
-    const aDate = getTripDate(a);
-    const bDate = getTripDate(b);
-    const aDay = aDate ? getTripDateKey(aDate) : '';
-    const bDay = bDate ? getTripDateKey(bDate) : '';
-
-    if (aDay !== bDay) return aDay.localeCompare(bDay);
-
-    const aStart = Number(a.startTime || a.id || 0) || 0;
-    const bStart = Number(b.startTime || b.id || 0) || 0;
-    return aStart - bStart || Number(a.id || 0) - Number(b.id || 0);
-  };
-
   const sumTripKm = (records: any[]) =>
     records.reduce((sum, trip) => sum + (Number(trip.totalKm) || 0), 0);
 
@@ -668,8 +586,8 @@ export default function App() {
   const monthKm = sumTripKm(monthTrips);
   const monthPetrol = sumPetrolAmount(monthTrips);
 
-  const getAvailableMonths = () =>
-    Array.from(new Set(trips.map(getTripMonthKey).filter(Boolean))).sort().reverse();
+  const getAvailableMonths = (): string[] =>
+    Array.from(new Set(trips.map((trip: any) => String(getTripMonthKey(trip))).filter(Boolean) as string[])).sort().reverse();
 
   const getMonthLabel = (monthKey: string) => {
     if (!monthKey) return 'All Months';
@@ -688,6 +606,7 @@ export default function App() {
   const reportPetrol = sumPetrolAmount(reportTrips);
   const reportParking = sumParkingAmount(reportTrips);
   const reportGrandTotal = sumTotalAmount(reportTrips);
+  const monthlyInsights: any[] = buildMonthlyInsights(trips);
 
   const getAvailableVisitors = () =>
     Array.from(new Set([
@@ -695,30 +614,13 @@ export default function App() {
       ...trips.map(trip => String(trip.visitor || '').trim()).filter(Boolean)
     ])).sort((a, b) => a.localeCompare(b));
 
-  const getHistoryTrips = () => {
-    const search = reportSearch.trim().toLocaleLowerCase();
-
-    return getFilteredTrips()
-      .filter(trip => {
-        const tripDate = getTripDate(trip);
-        const tripDateKey = tripDate ? getTripDateKey(tripDate) : '';
-        if (dateFrom && (!tripDateKey || tripDateKey < dateFrom)) return false;
-        if (dateTo && (!tripDateKey || tripDateKey > dateTo)) return false;
-        if (filterVisitor && trip.visitor !== filterVisitor) return false;
-        if (!search) return true;
-
-        const searchFields = [
-          trip.visitor,
-          trip.assignedBy,
-          getTripRecordedBy(trip),
-          trip.fromLoc,
-          trip.toLoc,
-          trip.purpose
-        ].join(' ').toLocaleLowerCase();
-        return searchFields.includes(search);
-      })
-      .sort(compareTripsByReportOrder);
-  };
+  const getHistoryTrips = () => filterHistoryTrips(trips, {
+    selectedMonth,
+    dateFrom,
+    dateTo,
+    filterVisitor,
+    search: reportSearch
+  }, recordedByName);
 
   const clearHistoryFilters = () => {
     setReportSearch('');
@@ -994,9 +896,8 @@ export default function App() {
         {
           margin: [0, 0, 0, 0],
           table: {
-            headerRows: 0,
             widths: [17, 50, 88, 78, 132, 116, 31, 72, 67, 64],
-            body: [[
+            ...buildPdfTableDefinition([
               { text: 'No.', style: 'tableHeader' },
               tableHeaderCell('Date', 'calendar'),
               tableHeaderCell('Visitor / Client', 'person'),
@@ -1007,17 +908,14 @@ export default function App() {
               tableHeaderCell('Petrol Amount', 'fuel'),
               tableHeaderCell('Parking Fee', 'parking'),
               tableHeaderCell('Total', 'total', '#087F86')
-            ], ...rows.map(row => row.map((text, columnIndex) => ({
-              text,
-              alignment: columnIndex === 0 || columnIndex >= 6 ? 'center' : 'left'
-            }))), [
+            ], rows, [
               { text: 'TOTAL', colSpan: 6, alignment: 'right', bold: true, color: '#0C3558' },
               {}, {}, {}, {}, {},
               { text: totalKm.toFixed(1), bold: true, color: '#0C3558', alignment: 'center' },
               { text: formatRupees(totalPetrol), bold: true, color: '#0C3558', alignment: 'center' },
               { text: formatRupees(totalParking), bold: true, color: '#0C3558', alignment: 'center' },
               { text: formatRupees(grandTotal), bold: true, color: '#087F86', alignment: 'center' }
-            ]]
+            ])
           },
           layout: {
             fillColor: (rowIndex: number) => {
@@ -1148,75 +1046,25 @@ export default function App() {
         return;
       }
 
-      const backup = JSON.parse(await file.text());
-      const data = backup?.data;
-      if (
-        (backup?.appId !== 'invictus-tracker' && backup?.appId !== 'petrol-expenses-tracker') ||
-        backup?.formatVersion !== 1 ||
-        !data ||
-        !Array.isArray(data.trips) ||
-        !Array.isArray(data.savedDestinations) ||
-        !Array.isArray(data.managers) ||
-        !Array.isArray(data.savedVisitors) ||
-        !data.savedDestinations.every((item: unknown) => typeof item === 'string') ||
-        !data.managers.every((item: unknown) => typeof item === 'string') ||
-        !data.savedVisitors.every((item: unknown) => typeof item === 'string')
-      ) {
-        alert('This backup file is not for this app.');
+      const validation = validateBackup(JSON.parse(await file.text()));
+      if (!validation.ok) {
+        alert(validation.error);
         return;
       }
+      setPendingBackupRestore(validation);
+    } catch (error: any) {
+      alert('Restore failed: ' + (error?.message || 'Choose a valid backup file.'));
+    } finally {
+      input.value = '';
+    }
+  };
 
-      const validRate = Number(data.petrolRate);
-      const validOffice = data.officeLocation === null ||
-        (typeof data.officeLocation?.lat === 'number' && Number.isFinite(data.officeLocation.lat) &&
-          typeof data.officeLocation?.lon === 'number' && Number.isFinite(data.officeLocation.lon));
-      const validTrips = data.trips.every((trip: any) =>
-        trip && typeof trip === 'object' &&
-        (typeof trip.id === 'number' || typeof trip.id === 'string') &&
-        typeof trip.date === 'string' &&
-        ['visitor', 'assignedBy', 'recordedBy', 'fromLoc', 'toLoc', 'purpose'].every((field: string) =>
-          trip[field] === undefined || trip[field] === null || typeof trip[field] === 'string'
-        ) &&
-        ['totalKm', 'ratePerKm', 'petrolCharges', 'parkingFees', 'totalAmount', 'startTime', 'endTime'].every((field: string) =>
-          trip[field] === undefined || trip[field] === null ||
-          (typeof trip[field] === 'number' && Number.isFinite(trip[field]))
-        )
-      );
-      if (!Number.isFinite(validRate) || validRate < 0 || !validOffice || !validTrips) {
-        alert('The backup contains invalid trip or setting data.');
-        return;
-      }
-
-      if (!window.confirm('Restore this backup? It will replace the trips and settings currently on this phone.')) {
-        return;
-      }
-
-      const restoredValues: Record<string, string> = {
-        invictusTrips: JSON.stringify(data.trips),
-        invictusOffice: JSON.stringify(data.officeLocation),
-        invictusDests: JSON.stringify(data.savedDestinations),
-        invictusManagers: JSON.stringify(data.managers),
-        invictusVisitors: JSON.stringify(data.savedVisitors),
-        invictusRate: String(validRate)
-      };
-      const keys = Object.keys(restoredValues);
-      const previousValues = new Map(keys.map(key => [key, localStorage.getItem(key)]));
-
-      try {
-        keys.forEach(key => localStorage.setItem(key, restoredValues[key]));
-      } catch (storageError) {
-        keys.forEach(key => {
-          const previous = previousValues.get(key);
-          try {
-            if (previous === null || previous === undefined) localStorage.removeItem(key);
-            else localStorage.setItem(key, previous);
-          } catch {
-            // Keep trying to restore the remaining saved values.
-          }
-        });
-        throw storageError;
-      }
-
+  const applyPendingBackupRestore = () => {
+    if (!pendingBackupRestore?.data) return;
+    const data = pendingBackupRestore.data;
+    const validRate = Number(data.petrolRate);
+    try {
+      restoreBackupToStorage(localStorage, data);
       setTrips(data.trips);
       setOfficeLocation(data.officeLocation);
       setSavedDestinations(data.savedDestinations);
@@ -1227,11 +1075,10 @@ export default function App() {
       setSelectedMonth('');
       clearHistoryFilters();
       cancelEditTrip();
+      setPendingBackupRestore(null);
       alert('Backup restored successfully.');
     } catch (error: any) {
       alert('Restore failed: ' + (error?.message || 'Choose a valid backup file.'));
-    } finally {
-      input.value = '';
     }
   };
 
@@ -1280,6 +1127,18 @@ export default function App() {
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
         {activeTab === 'tracker' && (
           <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 pb-5">
+            {showRecoveredTripNotice && (
+              <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+                <p>Your unfinished trip was recovered on this device. You can continue tracking or finish entering its details.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowRecoveredTripNotice(false)}
+                  className="shrink-0 text-xs font-semibold text-teal-800 underline underline-offset-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             {tripState === 'idle' && (
               <>
                 <section
@@ -1577,7 +1436,12 @@ export default function App() {
 
                   <div className="flex gap-3 border-t border-slate-100 pt-5">
                     <button
-                      onClick={() => setTripState('idle')}
+                      onClick={() => {
+                        clearTripDraft();
+                        setCurrentTrip(createEmptyTrip());
+                        setTripState('idle');
+                        setShowRecoveredTripNotice(false);
+                      }}
                       className="min-h-12 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                     >
                       Cancel
@@ -1652,6 +1516,46 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="monthly-insights-title">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <div>
+                  <h3 id="monthly-insights-title" className="text-sm font-bold text-[#102a35]">Monthly comparison</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Latest {monthlyInsights.length} months · all trips</p>
+                </div>
+                <History className="h-4 w-4 shrink-0 text-teal-700" />
+              </div>
+              {monthlyInsights.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[540px] w-full text-left text-[11px]">
+                    <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold">Month</th>
+                        <th className="px-3 py-2 text-right font-semibold">Trips</th>
+                        <th className="px-3 py-2 text-right font-semibold">KM</th>
+                        <th className="px-3 py-2 text-right font-semibold">Petrol</th>
+                        <th className="px-3 py-2 text-right font-semibold">Parking</th>
+                        <th className="px-3 py-2 text-right font-semibold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyInsights.map(month => (
+                        <tr key={month.month} className="border-t border-slate-100">
+                          <th scope="row" className="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">{getMonthLabel(month.month)}</th>
+                          <td className="px-3 py-2 text-right tabular-nums text-slate-600">{month.tripCount}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-slate-600">{month.totalKm.toFixed(1)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatRupees(month.petrolAmount)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatRupees(month.parkingAmount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-teal-800">{formatRupees(month.grandTotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="px-4 py-5 text-sm text-slate-500">Monthly comparisons appear after trips are recorded.</p>
+              )}
+            </section>
 
             {trips.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-10 text-center text-sm text-slate-500">
@@ -2472,6 +2376,75 @@ export default function App() {
         </button>
         </div>
       </nav>
+
+      {pendingBackupRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="backup-restore-title"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+          >
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">Backup preview</p>
+              <h2 id="backup-restore-title" className="mt-1 text-xl font-bold text-[#102a35]">Review before restoring</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Created {pendingBackupRestore.summary.createdAt
+                  ? new Date(pendingBackupRestore.summary.createdAt).toLocaleString()
+                  : 'date not recorded'}
+              </p>
+            </div>
+
+            <dl className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Trips</dt>
+                <dd className="mt-1 font-bold text-slate-800">{pendingBackupRestore.summary.tripCount}</dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Petrol rate</dt>
+                <dd className="mt-1 font-bold text-slate-800">{formatRupees(pendingBackupRestore.summary.petrolRate)} / km</dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Office location</dt>
+                <dd className="mt-1 font-bold text-slate-800">{pendingBackupRestore.summary.officeLocationSaved ? 'Saved' : 'Not set'}</dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Saved lists</dt>
+                <dd className="mt-1 font-bold text-slate-800">
+                  {pendingBackupRestore.summary.destinationCount} destinations · {pendingBackupRestore.summary.managerCount} people · {pendingBackupRestore.summary.visitorCount} clients
+                </dd>
+              </div>
+            </dl>
+
+            {pendingBackupRestore.duplicateIndexes.length > 0 && (
+              <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                {pendingBackupRestore.duplicateIndexes.length} possible duplicate trip {pendingBackupRestore.duplicateIndexes.length === 1 ? 'record was' : 'records were'} found in this backup. They will be restored as listed.
+              </p>
+            )}
+
+            <p className="mt-4 text-xs leading-5 text-slate-500">
+              Restoring replaces the trips and settings currently on this phone. Make a backup first if you need to keep the current data.
+            </p>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingBackupRestore(null)}
+                className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyPendingBackupRestore}
+                className="min-h-11 flex-1 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                Replace data
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
