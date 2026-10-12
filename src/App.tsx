@@ -19,7 +19,8 @@ import {
   Upload,
   Database,
   UserRound,
-  UsersRound
+  UsersRound,
+  Heart
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -2244,57 +2245,32 @@ export default function App() {
 
         {activeTab === 'settings' && (
           <>
-            <div className="mx-auto max-w-md space-y-4 pb-5">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div>
+            <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-3 pb-2">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="min-w-0">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Preferences</p>
                   <h2 className="text-xl font-bold tracking-tight text-[#102a35]">Settings</h2>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsMenu(true)}
+                  aria-label="Open settings menu"
+                  aria-expanded={showSettingsMenu}
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                >
+                  <Menu className="h-7 w-7" />
+                </button>
               </div>
 
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="settings-overview-title">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">At a glance</p>
-                  <h3 id="settings-overview-title" className="mt-0.5 text-base font-bold text-[#102a35]">Your tracker</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">Current setup and saved records</p>
+              <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm" aria-labelledby="settings-overview-title">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[1.8rem] brand-gradient-bg text-white shadow-lg shadow-teal-900/15">
+                  <Heart className="h-10 w-10 fill-current" />
                 </div>
-                <div className="divide-y divide-slate-100 px-4">
-                  <div className="flex items-center justify-between gap-3 py-4">
-                    <span className="flex items-center gap-2 text-sm text-slate-600">
-                      <UserRound className="h-4 w-4 text-teal-700" /> Phone name
-                    </span>
-                    <span className="max-w-[55%] truncate text-right text-sm font-semibold text-[#102a35]">{recordedByName || 'Not set'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 py-4">
-                    <span className="flex items-center gap-2 text-sm text-slate-600">
-                      <MapPin className="h-4 w-4 text-teal-700" /> Office location
-                    </span>
-                    <span className="text-right text-sm font-semibold text-[#102a35]">{officeLocation ? 'Set' : 'Not set'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 py-4">
-                    <span className="flex items-center gap-2 text-sm text-slate-600">
-                      <Fuel className="h-4 w-4 text-teal-700" /> Petrol rate
-                    </span>
-                    <span className="text-right text-sm font-semibold text-[#102a35]">{formatRupees(petrolRate)} / km</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 py-4">
-                    <span className="flex items-center gap-2 text-sm text-slate-600">
-                      <History className="h-4 w-4 text-teal-700" /> Saved trips
-                    </span>
-                    <span className="text-right text-sm font-semibold text-[#102a35]">{trips.length}</span>
-                  </div>
-                </div>
-                <p className="px-4 pb-3 text-[11px] leading-5 text-slate-500">Use Manage settings below to change preferences, manage backups, or view app details.</p>
+                <h3 id="settings-overview-title" className="text-lg font-semibold text-[#32434b]">Everything you need, in one place</h3>
+                <p className="mt-4 max-w-sm text-sm leading-7 text-slate-500">
+                  Manage this phone’s name, office location, trips and summary, petrol rate, clients, backups, and app details from the menu.
+                </p>
               </section>
-              <button
-                type="button"
-                onClick={() => setShowSettingsMenu(true)}
-                aria-expanded={showSettingsMenu}
-                className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
-              >
-                <Menu className="h-4 w-4" />
-                Manage settings
-              </button>
             </div>
 
             {showSettingsMenu && (
