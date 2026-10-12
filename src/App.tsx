@@ -21,7 +21,7 @@ import {
   UserRound,
   UsersRound
 } from 'lucide-react';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import {
@@ -40,104 +40,6 @@ import {
   restoreBackupToStorage,
   validateBackup
 } from './reportLogic.mjs';
-
-const buildOpenStreetMapEmbedUrl = (coords: { lat: number; lon: number }) => {
-  const latitudePadding = 0.005;
-  const longitudePadding = 0.008;
-  const bbox = [
-    coords.lon - longitudePadding,
-    coords.lat - latitudePadding,
-    coords.lon + longitudePadding,
-    coords.lat + latitudePadding
-  ].map(value => value.toFixed(6)).join(',');
-  const params = new URLSearchParams({
-    bbox,
-    layer: 'mapnik',
-    marker: `${coords.lat},${coords.lon}`
-  });
-  return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
-};
-
-type SharedMapLocation = {
-  text: string;
-  url: string | null;
-  coords: { lat: number; lon: number } | null;
-};
-
-const isValidMapPoint = (lat: number, lon: number) =>
-  Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-
-const parseSharedMapLocation = (text: string): SharedMapLocation | null => {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  const urlMatch = trimmed.match(/https?:\/\/[^\s<>]+/i);
-  const rawUrl = urlMatch?.[0]?.replace(/[),.;!?]+$/, '') || null;
-  let safeUrl: string | null = null;
-  let url: URL | null = null;
-  if (rawUrl) {
-    try {
-      url = new URL(rawUrl);
-      const isMapLink = url.hostname.toLowerCase().includes('map') || /\/maps?(?:\/|$)/i.test(url.pathname);
-      if (isMapLink && (url.protocol === 'https:' || url.protocol === 'http:')) {
-        safeUrl = url.toString();
-      }
-    } catch {
-      // Keep processing plain coordinates even if the accompanying link is malformed.
-    }
-  }
-
-  const coordinatePatterns = [
-    /geo:\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/i,
-    /@(-?\d{1,2}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/,
-    /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
-    /(?:[?&](?:q|query|ll|daddr|destination|center)=)(-?\d{1,2}(?:\.\d+)?)(?:%2c|,|\+|%20)(-?\d{1,3}(?:\.\d+)?)/i,
-    /^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
-  ];
-
-  let coords: { lat: number; lon: number } | null = null;
-  for (const pattern of coordinatePatterns) {
-    const match = trimmed.match(pattern);
-    if (match) {
-      const lat = Number(match[1]);
-      const lon = Number(match[2]);
-      if (isValidMapPoint(lat, lon)) {
-        coords = { lat, lon };
-        break;
-      }
-    }
-  }
-
-  if (!coords && url) {
-    const latitudeText = url.searchParams.get('mlat') || url.searchParams.get('lat');
-    const longitudeText = url.searchParams.get('mlon') || url.searchParams.get('lon');
-    const latitude = Number(latitudeText);
-    const longitude = Number(longitudeText);
-    if (latitudeText && longitudeText && isValidMapPoint(latitude, longitude)) {
-      coords = { lat: latitude, lon: longitude };
-    }
-
-    if (!coords) {
-      const osmHash = url.hash.match(/map=\d+\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/);
-      if (osmHash) {
-        const lat = Number(osmHash[1]);
-        const lon = Number(osmHash[2]);
-        if (isValidMapPoint(lat, lon)) coords = { lat, lon };
-      }
-    }
-  }
-
-  if (!coords && !safeUrl) return null;
-  return { text: trimmed, url: safeUrl, coords };
-};
-
-const SharedLocation = registerPlugin<{
-  getPendingShare(): Promise<{ text?: string }>;
-  addListener(
-    eventName: 'sharedText',
-    listenerFunc: (event: { text?: string }) => void
-  ): Promise<{ remove: () => Promise<void> }>;
-}>('SharedLocation');
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
@@ -165,11 +67,6 @@ export default function App() {
   const timerRef = useRef<any>(null);
 
   const [officeLocation, setOfficeLocation] = useState<any>(null);
-  const [homeMapLocation, setHomeMapLocation] = useState<{ lat: number; lon: number } | null>(null);
-  const [sharedMapLocation, setSharedMapLocation] = useState<SharedMapLocation | null>(null);
-  const [mapDestinationInput, setMapDestinationInput] = useState('');
-  const [isLocatingHomeMap, setIsLocatingHomeMap] = useState(false);
-  const [homeMapMessage, setHomeMapMessage] = useState('');
   const [officeSetupMessage, setOfficeSetupMessage] = useState('');
   const [isSavingOfficeLocation, setIsSavingOfficeLocation] = useState(false);
   const [savedDestinations, setSavedDestinations] = useState<string[]>([]);
@@ -195,28 +92,6 @@ export default function App() {
   const [currentTrip, setCurrentTrip] = useState(recoveredTripDraft?.trip || createEmptyTrip());
   const [pendingBackupRestore, setPendingBackupRestore] = useState<any>(null);
 
-  const receiveSharedMapLocation = (text: string) => {
-    const location = parseSharedMapLocation(text);
-    if (!location) {
-      setHomeMapMessage('Enter coordinates like 17.3850, 78.4867 or paste a map link.');
-      return;
-    }
-
-    setSharedMapLocation(location);
-    setMapDestinationInput('');
-    setActiveTab('tracker');
-    setHomeMapMessage(
-      location.coords
-        ? 'Location received · map preview is ready'
-        : 'Map link received · open it to view the shared place'
-    );
-  };
-
-  const submitMapDestination = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    receiveSharedMapLocation(mapDestinationInput);
-  };
-
   useEffect(() => {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
     const savedRecordedByName = localStorage.getItem('invictusRecordedBy') || '';
@@ -241,43 +116,6 @@ export default function App() {
     setSavedVisitors(savedVisitors);
     setPetrolRate(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5);
     setRateInput(String(Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 5));
-  }, []);
-
-  useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android') return;
-
-    let mounted = true;
-    let listener: { remove: () => Promise<void> } | null = null;
-
-    const takePendingShare = async () => {
-      try {
-        const result = await SharedLocation.getPendingShare();
-        if (mounted && result?.text) receiveSharedMapLocation(result.text);
-      } catch {
-        // The browser preview has no native share receiver; Android provides this bridge.
-      }
-    };
-
-    void SharedLocation.addListener('sharedText', event => {
-      if (mounted && event?.text) receiveSharedMapLocation(event.text);
-    }).then(handle => {
-      listener = handle;
-      if (!mounted) void handle.remove();
-    }).catch(() => {});
-
-    void takePendingShare();
-    const checkPendingShare = () => {
-      if (document.visibilityState === 'visible') void takePendingShare();
-    };
-    window.addEventListener('focus', checkPendingShare);
-    document.addEventListener('visibilitychange', checkPendingShare);
-
-    return () => {
-      mounted = false;
-      window.removeEventListener('focus', checkPendingShare);
-      document.removeEventListener('visibilitychange', checkPendingShare);
-      if (listener) void listener.remove();
-    };
   }, []);
 
   useEffect(() => {
@@ -344,25 +182,6 @@ export default function App() {
     });
   };
 
-  const showHomeMap = async () => {
-    setIsLocatingHomeMap(true);
-    setHomeMapMessage('');
-    try {
-      const coords = await getGPSLocation();
-      setHomeMapLocation(coords);
-      setHomeMapMessage('Showing your current area');
-    } catch {
-      if (officeLocation && Number.isFinite(Number(officeLocation.lat)) && Number.isFinite(Number(officeLocation.lon))) {
-        setHomeMapLocation({ lat: Number(officeLocation.lat), lon: Number(officeLocation.lon) });
-        setHomeMapMessage('Could not get your current location. Showing your saved office area.');
-      } else {
-        setHomeMapMessage('Allow location access and try again to show your area.');
-      }
-    } finally {
-      setIsLocatingHomeMap(false);
-    }
-  };
-
   const getRoadDistanceOSRM = async (start: any, end: any) => {
     try {
       const baseUrl = atob(
@@ -395,8 +214,6 @@ export default function App() {
     try {
       const coords = await getGPSLocation();
       const now = new Date();
-      setHomeMapLocation(coords);
-      setHomeMapMessage('Trip started here · tap Refresh to update your location');
 
       const todayString = now.toLocaleDateString('en-GB');
       const todaysTrips = trips.filter(
@@ -429,8 +246,6 @@ export default function App() {
     try {
       const coords = await getGPSLocation();
       const now = new Date();
-      setHomeMapLocation(coords);
-      setHomeMapMessage('Trip ended near here');
 
       let distanceKm = 0;
 
@@ -1340,10 +1155,6 @@ export default function App() {
 
   const inputClass =
     'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10';
-  const mapPreviewLocation = sharedMapLocation?.coords || homeMapLocation;
-  const mapDestinationUrl = sharedMapLocation?.coords
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${sharedMapLocation.coords.lat},${sharedMapLocation.coords.lon}`)}${homeMapLocation ? `&origin=${encodeURIComponent(`${homeMapLocation.lat},${homeMapLocation.lon}`)}` : ''}&travelmode=driving`
-    : sharedMapLocation?.url;
 
   return (
     <div className="app-shell flex w-full flex-col overflow-hidden bg-[#eaf4ef] font-sans text-slate-900">
@@ -1552,6 +1363,46 @@ export default function App() {
                   </div>
                 </section>
 
+                <section
+                  aria-label="Animated road illustration"
+                  className="relative flex min-h-[230px] flex-1 flex-col overflow-hidden rounded-[22px] border border-white/80 bg-gradient-to-br from-[#f9fffc] via-[#eaf7f2] to-[#e8f1fa] p-4 shadow-sm"
+                >
+                  <div className="relative z-10 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">A little road moment</p>
+                      <h3 className="mt-1 text-sm font-bold text-[#123d53]">Drive safe, travel smart</h3>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-2 flex min-h-[145px] flex-1 items-center overflow-hidden rounded-2xl" aria-hidden="true">
+                    <div className="absolute -right-6 top-1 h-20 w-20 rounded-full bg-amber-200/60 blur-[1px]" />
+                    <div className="absolute left-8 top-5 h-3 w-10 rounded-full bg-white/80 shadow-[12px_4px_0_-1px_rgba(255,255,255,0.65)]" />
+                    <div className="absolute bottom-0 left-0 right-0 h-10 rounded-t-[50%] bg-emerald-100/70" />
+                    <div className="absolute inset-x-3 top-1/2 h-10 -translate-y-1/2 rounded-full bg-[#31576a] shadow-inner" />
+                    <div className="absolute inset-x-5 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-white/80" />
+                    <div className="absolute left-[6%] top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow ring-2 ring-teal-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
+                    </div>
+                    <div className="absolute right-[6%] top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow ring-2 ring-blue-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                    </div>
+                    <div className="home-road-bike absolute left-[8%] top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-1.5 text-teal-800 shadow-md ring-1 ring-teal-100">
+                      <svg viewBox="0 0 52 40" className="h-8 w-10" fill="none">
+                        <circle cx="10" cy="29" r="6" fill="#123d53" />
+                        <circle cx="10" cy="29" r="2.5" fill="#d9f4ec" />
+                        <circle cx="42" cy="29" r="6" fill="#123d53" />
+                        <circle cx="42" cy="29" r="2.5" fill="#d9f4ec" />
+                        <path d="m10 29 12-1 8-10 6 1 6 10M22 28l-5-10h12l7 11M30 18l3-7h6m-2 0 5-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                        <path d="m17 17 5-4 8 1 4 5-5 5H20l-4-3 1-4Z" fill="currentColor" />
+                        <path d="m23 14 3-5 7 2 4 6-6 1-4-4Z" fill="#0f766e" />
+                        <circle cx="25" cy="5" r="3.2" fill="#f0b77c" />
+                        <path d="m24 8-4 5 7 3 5-3m-10 0-4 5m9-6 7 2" stroke="#123d53" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="relative z-10 mt-2 text-center text-[10px] font-medium text-slate-500">A little motion for the road ahead</p>
+                </section>
+
               </>
             )}
 
@@ -1592,107 +1443,6 @@ export default function App() {
                   End trip
                 </button>
               </div>
-            )}
-
-            {(tripState === 'idle' || tripState === 'tracking') && (
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="home-map-title">
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div>
-                    <h3 id="home-map-title" className="text-sm font-bold text-[#102a35]">Nearby map</h3>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      {sharedMapLocation?.coords
-                        ? 'Showing your selected destination'
-                        : tripState === 'tracking'
-                          ? 'Trip in progress · refresh to update GPS'
-                          : 'Share a WhatsApp location or view your area'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={showHomeMap}
-                    disabled={isLocatingHomeMap}
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl bg-teal-50 px-3 text-xs font-semibold text-teal-800 transition hover:bg-teal-100 disabled:opacity-60"
-                  >
-                    <MapPin className="h-3.5 w-3.5" />
-                    {isLocatingHomeMap ? 'Locating…' : homeMapLocation ? 'Refresh' : 'Locate me'}
-                  </button>
-                </div>
-                {sharedMapLocation && (
-                  <div className="mx-3 mb-3 flex items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-teal-900">{sharedMapLocation.coords ? 'Destination ready' : 'Shared map link'}</p>
-                      <p className="mt-0.5 truncate text-[10px] text-teal-800">
-                        {sharedMapLocation.coords
-                          ? `${sharedMapLocation.coords.lat.toFixed(5)}, ${sharedMapLocation.coords.lon.toFixed(5)}`
-                          : 'This link will open in your maps app'}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {mapDestinationUrl && (
-                        <a
-                          href={mapDestinationUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-lg bg-white px-2.5 py-2 text-[10px] font-bold text-teal-800 shadow-sm"
-                        >
-                          {sharedMapLocation.coords ? 'Directions' : 'Open map'}
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        aria-label="Clear selected destination"
-                        onClick={() => setSharedMapLocation(null)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-teal-800 hover:bg-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {mapPreviewLocation ? (
-                  <iframe
-                    title={sharedMapLocation?.coords ? 'Map of the selected destination' : 'Map of your current area'}
-                    src={buildOpenStreetMapEmbedUrl(mapPreviewLocation)}
-                    className="block h-44 w-full border-0"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-44 flex-col items-center justify-center gap-2 bg-slate-50 px-5 text-center text-slate-500">
-                    <Navigation className="h-6 w-6 text-teal-700" />
-                    <p className="text-xs">Share a location from WhatsApp, or tap “Locate me” to see your area.</p>
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2 px-4 py-2">
-                  <p role="status" className="min-w-0 text-[10px] text-slate-500">{homeMapMessage}</p>
-                  <a
-                    href="https://www.openstreetmap.org/copyright"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 text-[10px] text-slate-500 underline underline-offset-2"
-                  >
-                    © OpenStreetMap
-                  </a>
-                </div>
-                <details className="border-t border-slate-100 px-4 py-2.5">
-                  <summary className="cursor-pointer text-[11px] font-semibold text-teal-800">Enter a destination manually</summary>
-                  <form onSubmit={submitMapDestination} className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={mapDestinationInput}
-                      onChange={event => setMapDestinationInput(event.target.value)}
-                      placeholder="Map link or 17.3850, 78.4867"
-                      aria-label="Map link or destination coordinates"
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10"
-                    />
-                    <button
-                      type="submit"
-                      className="shrink-0 rounded-lg brand-gradient-button px-3 py-2 text-xs font-bold text-white"
-                    >
-                      Show
-                    </button>
-                  </form>
-                </details>
-              </section>
             )}
 
             {tripState === 'saving' && (
@@ -2832,7 +2582,7 @@ export default function App() {
           }`}
         >
           <FileText className="h-5 w-5" />
-          <span className="text-[10px] font-semibold">Reports</span>
+          <span className="text-[10px] font-semibold">Summary</span>
         </button>
 
         <button

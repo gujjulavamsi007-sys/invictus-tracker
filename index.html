@@ -48,6 +48,15 @@
       }
       .app-header { padding-top: env(safe-area-inset-top, 0px); }
       .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
+      @keyframes home-road-ride {
+        0%, 8% { left: 8%; opacity: 0; }
+        18%, 82% { opacity: 1; }
+        92%, 100% { left: 92%; opacity: 0; }
+      }
+      .home-road-bike { animation: home-road-ride 7s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .home-road-bike { animation: none; left: 50%; opacity: 1; }
+      }
       .brand-gradient-bg { background: linear-gradient(128deg, #086bd6 0%, #087f9b 53%, #227339 100%); }
       .brand-gradient-button { background: linear-gradient(110deg, #0874df 0%, #079ba7 56%, #279448 100%); }
       .brand-gradient-button:hover { filter: brightness(0.96) saturate(1.08); }
