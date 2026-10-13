@@ -43,25 +43,29 @@ import {
   validateBackup
 } from './reportLogic.mjs';
 
-type VisitorNameInputProps = {
+type SavedOptionInputProps = {
   value: string;
   options: string[];
   onChange: (value: string) => void;
   inputClassName: string;
   optionsId: string;
+  optionsLabel: string;
+  fieldLabel: string;
   placeholder?: string;
   required?: boolean;
 };
 
-function VisitorNameInput({
+function SavedOptionInput({
   value,
   options,
   onChange,
   inputClassName,
   optionsId,
+  optionsLabel,
+  fieldLabel,
   placeholder,
   required = false
-}: VisitorNameInputProps) {
+}: SavedOptionInputProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const normalizedValue = value.trim().toLocaleLowerCase();
   const matchingOptions = options
@@ -76,6 +80,7 @@ function VisitorNameInput({
           required={required}
           autoComplete="off"
           placeholder={placeholder}
+          aria-label={fieldLabel}
           value={value}
           onChange={event => {
             onChange(event.target.value);
@@ -85,7 +90,7 @@ function VisitorNameInput({
         />
         <button
           type="button"
-          aria-label={isOptionsOpen ? 'Hide saved visitor names' : 'Show saved visitor names'}
+          aria-label={`${isOptionsOpen ? 'Hide' : 'Show'} ${optionsLabel.toLowerCase()}`}
           aria-expanded={isOptionsOpen}
           aria-controls={optionsId}
           onClick={() => setIsOptionsOpen(open => !open)}
@@ -98,7 +103,7 @@ function VisitorNameInput({
         <div
           id={optionsId}
           role="group"
-          aria-label="Saved visitor names"
+          aria-label={optionsLabel}
           className="mt-1 max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm"
         >
           {matchingOptions.length > 0 ? matchingOptions.map(option => (
@@ -116,8 +121,8 @@ function VisitorNameInput({
           )) : (
             <p className="px-3 py-2 text-xs font-normal text-slate-500">
               {normalizedValue
-                ? 'No saved match. You can still save this new name.'
-                : 'No saved names yet. Type a name and save the trip.'}
+                ? 'No saved match. Keep typing to use your own entry.'
+                : 'No saved options yet. Type any value to continue.'}
             </p>
           )}
         </div>
@@ -1564,24 +1569,16 @@ export default function App() {
                       <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         To (Destination)
                       </label>
-                      <input
-                        type="text"
-                        list="destinations"
-                        placeholder="Search or type..."
+                      <SavedOptionInput
                         value={currentTrip.toLoc}
-                        onChange={e =>
-                          setCurrentTrip({
-                            ...currentTrip,
-                            toLoc: e.target.value
-                          })
-                        }
-                        className={inputClass}
+                        onChange={toLoc => setCurrentTrip({ ...currentTrip, toLoc })}
+                        options={savedDestinations}
+                        optionsId="current-trip-destination-options"
+                        optionsLabel="Saved destinations"
+                        fieldLabel="To destination"
+                        placeholder="Search or type..."
+                        inputClassName={inputClass}
                       />
-                      <datalist id="destinations">
-                        {savedDestinations.map(d => (
-                          <option key={d} value={d} />
-                        ))}
-                      </datalist>
                     </div>
                   </div>
 
@@ -1611,24 +1608,16 @@ export default function App() {
                       <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                         Assigned Person
                       </label>
-                      <input
-                        type="text"
-                        list="assignedPeopleList"
-                        placeholder="Select or type..."
+                      <SavedOptionInput
                         value={currentTrip.assignedBy}
-                        onChange={e =>
-                          setCurrentTrip({
-                            ...currentTrip,
-                            assignedBy: e.target.value
-                          })
-                        }
-                        className={inputClass}
+                        onChange={assignedBy => setCurrentTrip({ ...currentTrip, assignedBy })}
+                        options={assignedPeople}
+                        optionsId="current-trip-assigned-person-options"
+                        optionsLabel="Saved people"
+                        fieldLabel="Assigned person"
+                        placeholder="Select or type..."
+                        inputClassName={inputClass}
                       />
-                      <datalist id="assignedPeopleList">
-                        {assignedPeople.map(person => (
-                          <option key={person} value={person} />
-                        ))}
-                      </datalist>
                     </div>
                   </div>
 
@@ -1636,12 +1625,14 @@ export default function App() {
                     <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Visitor / Client Name
                     </label>
-                    <VisitorNameInput
+                    <SavedOptionInput
                       placeholder="e.g. Printer Shop, HDFC Bank"
                       value={currentTrip.visitor}
                       onChange={visitor => setCurrentTrip({ ...currentTrip, visitor })}
                       options={getAvailableVisitors()}
                       optionsId="visitor-name-options"
+                      optionsLabel="Saved visitor names"
+                      fieldLabel="Visitor or client name"
                       inputClassName={inputClass}
                     />
                   </div>
@@ -2126,50 +2117,65 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    From
-                    <input
+                  <div className="text-xs font-semibold text-slate-500">
+                    <span className="block">From</span>
+                    <SavedOptionInput
                       required
-                      list="past-trip-locations"
                       value={pastTripForm.fromLoc}
-                      onChange={event => setPastTripForm({ ...pastTripForm, fromLoc: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                      onChange={fromLoc => setPastTripForm({ ...pastTripForm, fromLoc })}
+                      options={savedDestinations}
+                      optionsId="past-trip-from-options"
+                      optionsLabel="Saved locations"
+                      fieldLabel="From location"
+                      placeholder="Type or choose..."
+                      inputClassName="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
                     />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-500">
-                    To
-                    <input
+                  </div>
+                  <div className="text-xs font-semibold text-slate-500">
+                    <span className="block">To</span>
+                    <SavedOptionInput
                       required
-                      list="past-trip-locations"
                       value={pastTripForm.toLoc}
-                      onChange={event => setPastTripForm({ ...pastTripForm, toLoc: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                      onChange={toLoc => setPastTripForm({ ...pastTripForm, toLoc })}
+                      options={savedDestinations}
+                      optionsId="past-trip-to-options"
+                      optionsLabel="Saved locations"
+                      fieldLabel="To location"
+                      placeholder="Type or choose..."
+                      inputClassName="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
                     />
-                  </label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="text-xs font-semibold text-slate-500">
                     <span className="block">Visitor / client</span>
-                    <VisitorNameInput
+                    <SavedOptionInput
                       value={pastTripForm.visitor}
                       onChange={visitor => setPastTripForm({ ...pastTripForm, visitor })}
                       options={getAvailableVisitors()}
                       optionsId="past-trip-visitor-options"
+                      optionsLabel="Saved visitor names"
+                      fieldLabel="Visitor or client name"
+                      placeholder="Type a name or choose one..."
                       inputClassName="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
                       required
                     />
                   </div>
-                  <label className="text-xs font-semibold text-slate-500">
-                    Assigned person
-                    <input
+                  <div className="text-xs font-semibold text-slate-500">
+                    <span className="block">Assigned person</span>
+                    <SavedOptionInput
                       required
-                      list="past-trip-assigned-people"
                       value={pastTripForm.assignedBy}
-                      onChange={event => setPastTripForm({ ...pastTripForm, assignedBy: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                      onChange={assignedBy => setPastTripForm({ ...pastTripForm, assignedBy })}
+                      options={assignedPeople}
+                      optionsId="past-trip-assigned-people-options"
+                      optionsLabel="Saved people"
+                      fieldLabel="Assigned person"
+                      placeholder="Type a name or choose one..."
+                      inputClassName="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
                     />
-                  </label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2206,13 +2212,6 @@ export default function App() {
                     className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
                   />
                 </label>
-
-                <datalist id="past-trip-locations">
-                  {savedDestinations.map(destination => <option key={destination} value={destination} />)}
-                </datalist>
-                <datalist id="past-trip-assigned-people">
-                  {assignedPeople.map(person => <option key={person} value={person} />)}
-                </datalist>
 
                 <div className="flex gap-3 border-t border-slate-100 pt-4">
                   <button
