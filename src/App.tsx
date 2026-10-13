@@ -10,6 +10,7 @@ import {
   Download,
   Plus,
   Save,
+  ChevronDown,
   AlertCircle,
   RefreshCw,
   FileText,
@@ -41,6 +42,89 @@ import {
   restoreBackupToStorage,
   validateBackup
 } from './reportLogic.mjs';
+
+type VisitorNameInputProps = {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  inputClassName: string;
+  optionsId: string;
+  placeholder?: string;
+  required?: boolean;
+};
+
+function VisitorNameInput({
+  value,
+  options,
+  onChange,
+  inputClassName,
+  optionsId,
+  placeholder,
+  required = false
+}: VisitorNameInputProps) {
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const normalizedValue = value.trim().toLocaleLowerCase();
+  const matchingOptions = options
+    .filter(option => !normalizedValue || option.toLocaleLowerCase().includes(normalizedValue))
+    .slice(0, 5);
+
+  return (
+    <div>
+      <div className="relative">
+        <input
+          type="text"
+          required={required}
+          autoComplete="off"
+          placeholder={placeholder}
+          value={value}
+          onChange={event => {
+            onChange(event.target.value);
+            setIsOptionsOpen(false);
+          }}
+          className={`${inputClassName} pr-12`}
+        />
+        <button
+          type="button"
+          aria-label={isOptionsOpen ? 'Hide saved visitor names' : 'Show saved visitor names'}
+          aria-expanded={isOptionsOpen}
+          aria-controls={optionsId}
+          onClick={() => setIsOptionsOpen(open => !open)}
+          className="absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
+        >
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOptionsOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      {isOptionsOpen && (
+        <div
+          id={optionsId}
+          role="group"
+          aria-label="Saved visitor names"
+          className="mt-1 max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
+          {matchingOptions.length > 0 ? matchingOptions.map(option => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                onChange(option);
+                setIsOptionsOpen(false);
+              }}
+              className="block min-h-10 w-full border-b border-slate-100 px-3 py-2 text-left text-sm font-medium text-slate-700 last:border-b-0 hover:bg-teal-50 focus:bg-teal-50 focus:outline-none"
+            >
+              {option}
+            </button>
+          )) : (
+            <p className="px-3 py-2 text-xs font-normal text-slate-500">
+              {normalizedValue
+                ? 'No saved match. You can still save this new name.'
+                : 'No saved names yet. Type a name and save the trip.'}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
@@ -1552,24 +1636,14 @@ export default function App() {
                     <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Visitor / Client Name
                     </label>
-                    <input
-                      type="text"
-                      list="visitorsList"
+                    <VisitorNameInput
                       placeholder="e.g. Printer Shop, HDFC Bank"
                       value={currentTrip.visitor}
-                      onChange={e =>
-                        setCurrentTrip({
-                          ...currentTrip,
-                          visitor: e.target.value
-                        })
-                      }
-                      className={inputClass}
+                      onChange={visitor => setCurrentTrip({ ...currentTrip, visitor })}
+                      options={getAvailableVisitors()}
+                      optionsId="visitor-name-options"
+                      inputClassName={inputClass}
                     />
-                    <datalist id="visitorsList">
-                      {getAvailableVisitors().map(visitor => (
-                        <option key={visitor} value={visitor} />
-                      ))}
-                    </datalist>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2075,16 +2149,17 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs font-semibold text-slate-500">
-                    Visitor / client
-                    <input
-                      required
-                      list="past-trip-visitors"
+                  <div className="text-xs font-semibold text-slate-500">
+                    <span className="block">Visitor / client</span>
+                    <VisitorNameInput
                       value={pastTripForm.visitor}
-                      onChange={event => setPastTripForm({ ...pastTripForm, visitor: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                      onChange={visitor => setPastTripForm({ ...pastTripForm, visitor })}
+                      options={getAvailableVisitors()}
+                      optionsId="past-trip-visitor-options"
+                      inputClassName="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-3 text-sm text-slate-700"
+                      required
                     />
-                  </label>
+                  </div>
                   <label className="text-xs font-semibold text-slate-500">
                     Assigned person
                     <input
@@ -2134,9 +2209,6 @@ export default function App() {
 
                 <datalist id="past-trip-locations">
                   {savedDestinations.map(destination => <option key={destination} value={destination} />)}
-                </datalist>
-                <datalist id="past-trip-visitors">
-                  {getAvailableVisitors().map(visitor => <option key={visitor} value={visitor} />)}
                 </datalist>
                 <datalist id="past-trip-assigned-people">
                   {assignedPeople.map(person => <option key={person} value={person} />)}
