@@ -33,6 +33,9 @@ jobs:
       - name: Add Android Platform
         run: npx cap add android
 
+      - name: Generate Android app icon
+        run: npx capacitor-assets generate --android --assetPath assets
+
       - name: Add GPS Permissions
         run: |
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
