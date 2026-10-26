@@ -1,5 +1,10 @@
 export const TRIP_DRAFT_STORAGE_KEY = 'invictusTripDraft';
 export const PDF_TABLE_HEADER_ROWS = 0;
+export const CLAIM_STATUSES = Object.freeze(['Pending', 'Submitted', 'Approved', 'Paid']);
+
+export function getClaimStatus(trip) {
+  return CLAIM_STATUSES.includes(trip?.claimStatus) ? trip.claimStatus : 'Pending';
+}
 
 export const createEmptyTrip = () => ({
   startCoords: null,
@@ -83,6 +88,7 @@ export function buildTripRecord(currentTrip, recordedByName, petrolRate, id = Da
     petrolCharges: km * petrolRate,
     parkingFees: parking,
     totalAmount: km * petrolRate + parking,
+    claimStatus: 'Pending',
     purpose: currentTrip.purpose,
     startTime: currentTrip.startTime,
     endTime: currentTrip.endTime
@@ -219,6 +225,7 @@ export function validateBackup(backup) {
     trip && typeof trip === 'object' &&
     (typeof trip.id === 'number' || typeof trip.id === 'string') &&
     typeof trip.date === 'string' &&
+    (trip.claimStatus === undefined || CLAIM_STATUSES.includes(trip.claimStatus)) &&
     ['visitor', 'assignedBy', 'recordedBy', 'fromLoc', 'toLoc', 'purpose'].every(field =>
       trip[field] === undefined || trip[field] === null || typeof trip[field] === 'string'
     ) &&
