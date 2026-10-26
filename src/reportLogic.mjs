@@ -327,4 +327,3 @@ export function buildPdfTableDefinition(headerCells, rows, totalRow) {
     ]
   };
 }
-
