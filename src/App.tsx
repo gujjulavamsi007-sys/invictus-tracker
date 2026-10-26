@@ -14,7 +14,6 @@ import {
   AlertCircle,
   RefreshCw,
   FileText,
-  Share2,
   ChevronRight,
   Fuel,
   Trash2,
@@ -32,20 +31,17 @@ import {
   buildMonthlyInsights,
   buildPdfTableDefinition,
   buildTripRecord,
-  CLAIM_STATUSES,
   compareTripsByReportOrder,
   createEmptyTrip,
   filterHistoryTrips,
   getTripDate,
   getTripDateKey,
   getTripMonthKey,
-  getClaimStatus,
   persistTripDraft,
   readTripDraft,
   restoreBackupToStorage,
   validateBackup
 } from './reportLogic.mjs';
-import { buildDeskPackHtml } from './deskPack.mjs';
 
 type SavedOptionInputProps = {
   value: string;
@@ -661,7 +657,6 @@ export default function App() {
       petrolCharges,
       parkingFees,
       totalAmount: petrolCharges + parkingFees,
-      claimStatus: 'Pending',
       purpose: String(pastTripForm.purpose || '').trim(),
       startTime: tripStart.getTime(),
       endTime: tripStart.getTime(),
@@ -717,15 +712,6 @@ export default function App() {
     `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
   const getTripRecordedBy = (trip: any) => trip.recordedBy || recordedByName;
-
-  const updateTripClaimStatus = (tripId: number, claimStatus: string) => {
-    if (!CLAIM_STATUSES.includes(claimStatus)) return;
-    const updatedTrips = trips.map(trip =>
-      Number(trip.id) === Number(tripId) ? { ...trip, claimStatus } : trip
-    );
-    setTrips(updatedTrips);
-    localStorage.setItem('invictusTrips', JSON.stringify(updatedTrips));
-  };
 
   const now = new Date();
   const todayKey = getTripDateKey(now);
@@ -799,8 +785,7 @@ export default function App() {
       'Petrol Reimbursement (₹)',
       'Parking (₹)',
       'Grand Total (₹)',
-      'Purpose / Remarks',
-      'Claim Status'
+      'Purpose / Remarks'
     ];
 
     let csvContent = headers.map(csvEscape).join(',') + '\n';
@@ -828,14 +813,13 @@ export default function App() {
         getTripPetrolAmount(t).toFixed(2),
         Number(t.parkingFees || 0).toFixed(2),
         getTripTotalAmount(t).toFixed(2),
-        t.purpose,
-        getClaimStatus(t)
+        t.purpose
       ];
 
       csvContent += row.map(csvEscape).join(',') + '\n';
     });
 
-    csvContent += `,,,,,,TOTALS,${totalKm.toFixed(1)},,${totalPetrol.toFixed(2)},${totalParking.toFixed(2)},${grandTotal.toFixed(2)},,\n`;
+    csvContent += `,,,,,,TOTALS,${totalKm.toFixed(1)},,${totalPetrol.toFixed(2)},${totalParking.toFixed(2)},${grandTotal.toFixed(2)},\n`;
 
     return csvContent;
   };
@@ -945,8 +929,7 @@ export default function App() {
         (Number(trip.totalKm) || 0).toFixed(1),
         formatRupees(getTripPetrolAmount(trip)),
         formatRupees(Number(trip.parkingFees) || 0),
-        formatRupees(getTripTotalAmount(trip)),
-        getClaimStatus(trip)
+        formatRupees(getTripTotalAmount(trip))
       ]);
 
     const reportIconPaths: Record<string, string> = {
@@ -1055,7 +1038,7 @@ export default function App() {
         {
           margin: [0, 0, 0, 0],
           table: {
-            widths: [17, 50, 88, 78, 132, 116, 31, 72, 67, 64, 58],
+            widths: [17, 50, 88, 78, 132, 116, 31, 72, 67, 64],
             ...buildPdfTableDefinition([
               { text: 'No.', style: 'tableHeader' },
               tableHeaderCell('Date', 'calendar'),
@@ -1066,16 +1049,14 @@ export default function App() {
               tableHeaderCell('KM', 'road'),
               tableHeaderCell('Petrol Amount', 'fuel'),
               tableHeaderCell('Parking Fee', 'parking'),
-              tableHeaderCell('Total', 'total', '#087F86'),
-              tableHeaderCell('Claim Status', 'document', '#087F86')
+              tableHeaderCell('Total', 'total', '#087F86')
             ], rows, [
               { text: 'TOTAL', colSpan: 6, alignment: 'right', bold: true, color: '#0C3558' },
               {}, {}, {}, {}, {},
               { text: totalKm.toFixed(1), bold: true, color: '#0C3558', alignment: 'center' },
               { text: formatRupees(totalPetrol), bold: true, color: '#0C3558', alignment: 'center' },
               { text: formatRupees(totalParking), bold: true, color: '#0C3558', alignment: 'center' },
-              { text: formatRupees(grandTotal), bold: true, color: '#087F86', alignment: 'center' },
-              {}
+              { text: formatRupees(grandTotal), bold: true, color: '#087F86', alignment: 'center' }
             ])
           },
           layout: {
@@ -1141,211 +1122,6 @@ export default function App() {
       await pdf.download(fileName);
     } catch (error: any) {
       alert('PDF export failed: ' + (error?.message || 'Please try again.'));
-    }
-  };
-
-  const shareMonthlyRecap = async () => {
-    if (reportTrips.length === 0) {
-      alert('Add a trip before sharing a travel recap.');
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 675;
-    const context = canvas.getContext('2d');
-    if (!context) {
-      alert('Could not prepare the recap card. Please try again.');
-      return;
-    }
-
-    const background = context.createLinearGradient(0, 0, 1200, 675);
-    background.addColorStop(0, '#0876d1');
-    background.addColorStop(0.54, '#078f9d');
-    background.addColorStop(1, '#237b49');
-    context.fillStyle = background;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    context.fillStyle = 'rgba(255,255,255,.08)';
-    context.beginPath();
-    context.arc(1090, 80, 210, 0, Math.PI * 2);
-    context.fill();
-    context.beginPath();
-    context.arc(90, 640, 180, 0, Math.PI * 2);
-    context.fill();
-
-    context.fillStyle = '#c7fff0';
-    context.font = '700 18px Arial, sans-serif';
-    context.fillText('TRIP & PETROL EXPENSE TRACKER', 66, 64);
-    context.textAlign = 'right';
-    context.fillStyle = 'rgba(255,255,255,.82)';
-    context.font = '700 15px Arial, sans-serif';
-    context.fillText('MONTHLY TRAVEL RECAP', 1134, 64);
-    context.textAlign = 'left';
-
-    context.fillStyle = '#ffffff';
-    context.font = '700 42px Arial, sans-serif';
-    context.fillText('Your travel at a glance', 66, 138);
-    context.font = '600 27px Arial, sans-serif';
-    context.fillStyle = '#e5ffff';
-    context.fillText(getMonthLabel(selectedMonth), 66, 184);
-    context.font = '17px Arial, sans-serif';
-    context.fillStyle = 'rgba(255,255,255,.86)';
-    context.fillText(`Prepared for ${recordedByName.trim() || 'you'}`, 66, 216);
-
-    context.fillStyle = 'rgba(255,255,255,.96)';
-    context.beginPath();
-    context.roundRect(54, 253, 1092, 338, 28);
-    context.fill();
-
-    const metricItems = [
-      { label: 'TRIPS', value: String(reportTrips.length), color: '#087c91' },
-      { label: 'TOTAL KM', value: `${reportKm.toFixed(1)} km`, color: '#087c91' },
-      { label: 'PETROL', value: formatRupees(reportPetrol), color: '#087c91' },
-      { label: 'PARKING', value: formatRupees(reportParking), color: '#087c91' }
-    ];
-    const tileX = 78;
-    const tileGap = 14;
-    const tileWidth = 250;
-    metricItems.forEach((item, index) => {
-      const x = tileX + index * (tileWidth + tileGap);
-      context.fillStyle = '#edf8f8';
-      context.beginPath();
-      context.roundRect(x, 296, tileWidth, 118, 18);
-      context.fill();
-      context.fillStyle = '#71848c';
-      context.font = '700 15px Arial, sans-serif';
-      context.fillText(item.label, x + 20, 329);
-      context.fillStyle = item.color;
-      context.font = '700 27px Arial, sans-serif';
-      context.fillText(item.value, x + 20, 375, tileWidth - 40);
-    });
-
-    context.fillStyle = '#087d91';
-    context.beginPath();
-    context.roundRect(78, 438, 1024, 112, 18);
-    context.fill();
-    context.fillStyle = '#d9fbf7';
-    context.font = '700 15px Arial, sans-serif';
-    context.fillText('TOTAL CLAIM AMOUNT', 102, 474);
-    context.fillStyle = '#ffffff';
-    context.font = '700 38px Arial, sans-serif';
-    context.fillText(formatRupees(reportGrandTotal), 102, 523);
-    context.textAlign = 'right';
-    context.fillStyle = 'rgba(255,255,255,.76)';
-    context.font = '14px Arial, sans-serif';
-    context.fillText(`${reportTrips.length} ${reportTrips.length === 1 ? 'trip' : 'trips'} recorded`, 1128, 632);
-    context.textAlign = 'left';
-
-    const exportDate = getTripDateKey(new Date());
-    const fileName = `Travel_Recap_${selectedMonth || 'All_Months'}_${exportDate}.png`;
-    try {
-      if (Capacitor.isNativePlatform()) {
-        const base64 = canvas.toDataURL('image/png').split(',')[1];
-        await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
-        const fileUri = await Filesystem.getUri({ path: fileName, directory: Directory.Cache });
-        await Share.share({
-          title: 'Monthly Travel Recap',
-          text: `${getMonthLabel(selectedMonth)} · ${reportTrips.length} trips · ${reportKm.toFixed(1)} km · ${formatRupees(reportGrandTotal)}`,
-          url: fileUri.uri,
-          dialogTitle: 'Share travel recap'
-        });
-        return;
-      }
-
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Image could not be created.')), 'image/png');
-      });
-      const shareNavigator = navigator as Navigator & {
-        canShare?: (data?: ShareData) => boolean;
-        share?: (data: ShareData) => Promise<void>;
-      };
-      const imageFile = new File([blob], fileName, { type: 'image/png' });
-      if (shareNavigator.share && shareNavigator.canShare?.({ files: [imageFile] })) {
-        await shareNavigator.share({ files: [imageFile], title: 'Monthly Travel Recap' });
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') alert('Travel recap failed: ' + (error?.message || 'Please try again.'));
-    }
-  };
-
-  const exportBossDeskPack = async () => {
-    const selectedTrips = getFilteredTrips().slice().sort(compareTripsByReportOrder);
-    if (selectedTrips.length === 0) {
-      alert('Add a trip before creating a Boss Desk Pack.');
-      return;
-    }
-
-    const generatedOn = new Date().toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
-    const html = buildDeskPackHtml({
-      monthLabel: getMonthLabel(selectedMonth),
-      recordedByName,
-      generatedOn,
-      summary: {
-        tripCount: selectedTrips.length,
-        totalKm: sumTripKm(selectedTrips).toFixed(1),
-        petrolAmount: formatRupees(sumPetrolAmount(selectedTrips)),
-        parkingFee: formatRupees(sumParkingAmount(selectedTrips)),
-        grandTotal: formatRupees(sumTotalAmount(selectedTrips))
-      },
-      trips: selectedTrips.map(trip => ({
-        date: trip.date || '-',
-        visitor: trip.visitor || '-',
-        assignedBy: trip.assignedBy || '-',
-        fromLoc: trip.fromLoc || '-',
-        toLoc: trip.toLoc || '-',
-        purpose: trip.purpose || '-',
-        totalKm: (Number(trip.totalKm) || 0).toFixed(1),
-        petrolAmount: formatRupees(getTripPetrolAmount(trip)),
-        parkingFee: formatRupees(Number(trip.parkingFees) || 0),
-        totalAmount: formatRupees(getTripTotalAmount(trip)),
-        claimStatus: getClaimStatus(trip)
-      }))
-    });
-    const exportDate = getTripDateKey(new Date());
-    const fileName = `Boss_Desk_Pack_${selectedMonth || 'All_Months'}_${exportDate}.html`;
-
-    try {
-      if (Capacitor.isNativePlatform()) {
-        await Filesystem.writeFile({
-          path: fileName,
-          data: html,
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8
-        });
-        const fileUri = await Filesystem.getUri({ path: fileName, directory: Directory.Documents });
-        await Share.share({
-          title: 'Boss Desk Pack',
-          text: 'Offline trip and petrol expense report',
-          url: fileUri.uri,
-          dialogTitle: 'Share / Save Boss Desk Pack'
-        });
-        return;
-      }
-
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') alert('Boss Desk Pack failed: ' + (error?.message || 'Please try again.'));
     }
   };
 
@@ -1984,47 +1760,6 @@ export default function App() {
               </div>
             </div>
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="travel-recap-title">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-teal-700">Shareable card</p>
-                  <h3 id="travel-recap-title" className="mt-1 text-base font-bold text-[#102a35]">Monthly travel recap</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">A colorful image with your trips and claim total.</p>
-                </div>
-                <Share2 className="mt-1 h-5 w-5 shrink-0 text-teal-700" />
-              </div>
-              <div className="brand-gradient-bg overflow-hidden rounded-xl p-4 text-white">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-teal-100">Trip &amp; Petrol Expense Tracker</div>
-                  <div className="rounded-full bg-white/15 px-2.5 py-1 text-[9px] font-semibold">{getMonthLabel(selectedMonth)}</div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-white/10 p-2.5">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-white/70">Trips</p>
-                    <p className="mt-1 text-lg font-bold tabular-nums">{reportTrips.length}</p>
-                  </div>
-                  <div className="rounded-lg bg-white/10 p-2.5">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-white/70">Total KM</p>
-                    <p className="mt-1 text-lg font-bold tabular-nums">{reportKm.toFixed(1)} km</p>
-                  </div>
-                  <div className="col-span-2 rounded-lg bg-white/15 p-2.5">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-white/70">Total claim amount</p>
-                    <p className="mt-1 text-xl font-bold tabular-nums">{formatRupees(reportGrandTotal)}</p>
-                  </div>
-                </div>
-                {recordedByName.trim() && <p className="mt-3 text-[10px] text-white/80">Prepared for {recordedByName.trim()}</p>}
-              </div>
-              <button
-                type="button"
-                onClick={shareMonthlyRecap}
-                disabled={reportTrips.length === 0}
-                className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Share2 className="h-4 w-4" />
-                Share recap card
-              </button>
-            </section>
-
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="monthly-insights-title">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                 <div>
@@ -2242,23 +1977,6 @@ export default function App() {
                                   </p>
                                 )}
 
-                                <label className="flex items-center justify-between gap-3">
-                                  <span className="text-xs font-medium text-slate-500">Claim status</span>
-                                  <select
-                                    value={getClaimStatus(trip)}
-                                    onChange={event => updateTripClaimStatus(Number(trip.id), event.target.value)}
-                                    aria-label={`Claim status for ${trip.visitor || 'trip'} on ${trip.date}`}
-                                    className={`min-h-9 max-w-[170px] rounded-full border px-3 py-1.5 text-xs font-semibold outline-none focus:ring-4 focus:ring-teal-700/15 ${
-                                      getClaimStatus(trip) === 'Pending' ? 'border-amber-200 bg-amber-50 text-amber-800' :
-                                      getClaimStatus(trip) === 'Submitted' ? 'border-blue-200 bg-blue-50 text-blue-800' :
-                                      getClaimStatus(trip) === 'Approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' :
-                                      'border-teal-200 bg-teal-50 text-teal-800'
-                                    }`}
-                                  >
-                                    {CLAIM_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                  </select>
-                                </label>
-
                                 <div className="flex items-end justify-between gap-3">
                                   <span className="text-xs italic text-slate-400">{trip.purpose || '-'}</span>
                                   <span className="shrink-0 text-xs font-bold text-slate-700">
@@ -2333,28 +2051,20 @@ export default function App() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={exportCSV}
-                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  className="brand-gradient-button flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-white shadow-sm transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
                 >
                   <Download className="h-4 w-4" />
                   CSV
                 </button>
                 <button
                   onClick={exportPDF}
-                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-2 py-2.5 text-xs font-bold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100 focus:outline-none focus:ring-4 focus:ring-teal-700/20"
                 >
                   <FileText className="h-4 w-4" />
                   PDF
-                </button>
-                <button
-                  onClick={exportBossDeskPack}
-                  title="Create an offline HTML report for a desktop"
-                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2 py-2.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-700/20"
-                >
-                  <FileText className="h-4 w-4" />
-                  Desk Pack
                 </button>
               </div>
             </div>
