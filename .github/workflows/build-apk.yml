@@ -1,9 +1,20 @@
 name: Build Android APK
 
 on:
+  pull_request:
+    branches: [ main, master ]
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - app-update.json
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -33,19 +44,34 @@ jobs:
       - name: Add Android Platform
         run: npx cap add android
 
+      - name: Sync Capacitor plugins
+        run: npx cap sync android
+
       - name: Generate Android app icon
         run: npx capacitor-assets generate --android --assetPath assets
+
+      - name: Configure Android in-app updater
+        run: python3 scripts/configure_android_updater.py
 
       - name: Add GPS Permissions
         run: |
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
+      - name: Set Android app version
+        id: app_version
+        run: |
+          echo "version_code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "version_name=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
       - name: Configure Android Signing
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ steps.app_version.outputs.version_code }}
+          ANDROID_VERSION_NAME: ${{ steps.app_version.outputs.version_name }}
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/invictus-release.jks
 
@@ -75,12 +101,20 @@ jobs:
                   1
               )
 
-          text = re.sub(
+          text, code_matches = re.subn(
               r'versionCode\s+\d+',
-              'versionCode ' + os.environ["GITHUB_RUN_NUMBER"],
+              'versionCode ' + os.environ["ANDROID_VERSION_CODE"],
               text,
               count=1
           )
+          text, name_matches = re.subn(
+              r'''versionName\s+["'][^"']+["']''',
+              'versionName "' + os.environ["ANDROID_VERSION_NAME"] + '"',
+              text,
+              count=1
+          )
+          if code_matches != 1 or name_matches != 1:
+              raise SystemExit("Could not set the Android version code and version name.")
 
           if re.search(r'(?m)^\s*debug\s*\{', text):
               text = re.sub(
@@ -118,3 +152,46 @@ jobs:
         with:
           name: InvictusTrack-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Prepare APK for GitHub Release
+        if: github.ref == 'refs/heads/main'
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk trip-petrol-expense-tracker.apk
+
+      - name: Publish signed APK release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.app_version.outputs.version_name }}
+          name: Trip & Petrol Expense Tracker v${{ steps.app_version.outputs.version_name }}
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: trip-petrol-expense-tracker.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish app update information
+        if: github.ref == 'refs/heads/main'
+        env:
+          APP_VERSION_CODE: ${{ steps.app_version.outputs.version_code }}
+          APP_VERSION_NAME: ${{ steps.app_version.outputs.version_name }}
+          RELEASE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git checkout -B publish-app-update-info origin/main
+            python3 scripts/write_app_update_manifest.py
+            git add app-update.json
+            if git diff --cached --quiet; then
+              echo "Update information is already published."
+              exit 0
+            fi
+            git commit -m "Publish app update information v${APP_VERSION_NAME}"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "The main branch changed while publishing update information; retrying."
+            sleep 2
+          done
+          exit 1

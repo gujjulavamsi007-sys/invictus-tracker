@@ -23,9 +23,16 @@ import {
   UsersRound,
   Heart
 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import {
+  APP_UPDATE_DOWNLOAD_URL,
+  APP_UPDATE_MANIFEST_URL,
+  isNewerVersion,
+  parseUpdateManifest
+} from './appUpdates.mjs';
 import {
   buildEditedTripList,
   buildMonthlyInsights,
@@ -131,6 +138,20 @@ function SavedOptionInput({
   );
 }
 
+type AppUpdaterPlugin = {
+  downloadApk: (options: { url: string }) => Promise<{ downloadId: number }>;
+  getDownloadStatus: (options: { downloadId: number }) => Promise<{
+    status: 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'missing';
+    progress: number;
+  }>;
+  installApk: (options: { downloadId: number }) => Promise<{
+    permissionRequired?: boolean;
+    opened?: boolean;
+  }>;
+};
+
+const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
   const [showReportsMenu, setShowReportsMenu] = useState(false);
@@ -181,6 +202,18 @@ export default function App() {
 
   const [currentTrip, setCurrentTrip] = useState(recoveredTripDraft?.trip || createEmptyTrip());
   const [pendingBackupRestore, setPendingBackupRestore] = useState<any>(null);
+  const [installedAppInfo, setInstalledAppInfo] = useState({ version: '1.0.0', build: '0' });
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'available' | 'current' | 'error'>('idle');
+  const [latestUpdate, setLatestUpdate] = useState<ReturnType<typeof parseUpdateManifest> | null>(null);
+  const [updateError, setUpdateError] = useState('');
+  const [installPermissionMessage, setInstallPermissionMessage] = useState('');
+  const [pendingUpdateDownloadId, setPendingUpdateDownloadId] = useState<number | null>(() => {
+    const savedId = Number(localStorage.getItem('invictusPendingUpdateDownloadId'));
+    return Number.isSafeInteger(savedId) && savedId > 0 ? savedId : null;
+  });
+  const [updateDownloadState, setUpdateDownloadState] = useState<'idle' | 'downloading' | 'ready' | 'failed'>('idle');
+  const [updateDownloadProgress, setUpdateDownloadProgress] = useState(0);
 
   useEffect(() => {
     const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
@@ -209,6 +242,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    CapacitorApp.getInfo()
+      .then(info => setInstalledAppInfo({ version: info.version || 'unknown', build: info.build || '0' }))
+      .catch(error => console.error('Could not read the installed app version', error));
+  }, []);
+
+  useEffect(() => {
     if (tripState === 'tracking') {
       const updateElapsed = () => {
         const startedAt = Number(currentTrip.startTime) || Date.now();
@@ -233,6 +273,46 @@ export default function App() {
       console.error('Could not save the in-progress trip draft', error);
     }
   }, [tripState, currentTrip]);
+
+  useEffect(() => {
+    if (!showUpdateDialog || updateDownloadState !== 'downloading' || !pendingUpdateDownloadId) return;
+
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    const checkDownload = async () => {
+      try {
+        const status = await AppUpdater.getDownloadStatus({ downloadId: pendingUpdateDownloadId });
+        if (cancelled) return;
+        setUpdateDownloadProgress(Math.min(100, Math.max(0, Number(status.progress) || 0)));
+        if (status.status === 'completed') {
+          setUpdateDownloadProgress(100);
+          setUpdateDownloadState('ready');
+          setUpdateError('');
+          return;
+        }
+        if (status.status === 'failed' || status.status === 'missing') {
+          setUpdateDownloadState('failed');
+          setUpdateError('The update could not be downloaded. Check your internet connection and try again.');
+          localStorage.removeItem('invictusPendingUpdateDownloadId');
+          localStorage.removeItem('invictusPendingUpdateVersion');
+          setPendingUpdateDownloadId(null);
+          return;
+        }
+        timeoutId = window.setTimeout(checkDownload, 900);
+      } catch (error) {
+        if (cancelled) return;
+        setUpdateDownloadState('failed');
+        setUpdateError('The update download stopped. Check your connection and try again.');
+        console.error('Could not read app update download status', error);
+      }
+    };
+
+    void checkDownload();
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [showUpdateDialog, updateDownloadState, pendingUpdateDownloadId]);
 
   const clearTripDraft = () => {
     try {
@@ -442,6 +522,117 @@ export default function App() {
     setRecordedByInput(normalizedName);
     localStorage.setItem('invictusRecordedBy', normalizedName);
     alert('Name saved on this phone. New trips will include it.');
+  };
+
+  const checkForUpdates = async () => {
+    setShowUpdateDialog(true);
+    setUpdateCheckState('checking');
+    setUpdateError('');
+    setInstallPermissionMessage('');
+    setLatestUpdate(null);
+    setUpdateDownloadState('idle');
+
+    if (Capacitor.getPlatform() !== 'android') {
+      setUpdateCheckState('error');
+      setUpdateError('In-app updates are available in the installed Android app.');
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const appInfo = await CapacitorApp.getInfo();
+      const installedBuild = Number(appInfo.build);
+      if (!Number.isSafeInteger(installedBuild) || installedBuild < 1) {
+        throw new Error('Could not read this app’s installed version.');
+      }
+      setInstalledAppInfo({ version: appInfo.version || 'unknown', build: appInfo.build || '0' });
+
+      const response = await fetch(`${APP_UPDATE_MANIFEST_URL}?check=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Could not reach the latest app version.');
+      const manifest = parseUpdateManifest(await response.json());
+      setLatestUpdate(manifest);
+
+      if (!isNewerVersion(installedBuild, manifest.versionCode)) {
+        setUpdateCheckState('current');
+        return;
+      }
+
+      setUpdateCheckState('available');
+      const savedId = Number(localStorage.getItem('invictusPendingUpdateDownloadId'));
+      const savedVersion = localStorage.getItem('invictusPendingUpdateVersion');
+      if (savedVersion === String(manifest.versionCode) && Number.isSafeInteger(savedId) && savedId > 0) {
+        try {
+          const status = await AppUpdater.getDownloadStatus({ downloadId: savedId });
+          setPendingUpdateDownloadId(savedId);
+          if (status.status === 'completed') {
+            setUpdateDownloadProgress(100);
+            setUpdateDownloadState('ready');
+          } else if (['pending', 'running', 'paused'].includes(status.status)) {
+            setUpdateDownloadProgress(Math.min(100, Math.max(0, Number(status.progress) || 0)));
+            setUpdateDownloadState('downloading');
+          } else {
+            localStorage.removeItem('invictusPendingUpdateDownloadId');
+            localStorage.removeItem('invictusPendingUpdateVersion');
+            setPendingUpdateDownloadId(null);
+          }
+        } catch (error) {
+          console.error('Could not resume the saved app update download', error);
+        }
+      }
+    } catch (error: any) {
+      setUpdateCheckState('error');
+      setUpdateError(error?.message || 'Could not check for updates. Check your internet connection and try again.');
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  };
+
+  const downloadAvailableUpdate = async () => {
+    if (!latestUpdate || updateDownloadState === 'downloading') return;
+    setUpdateError('');
+    setInstallPermissionMessage('');
+    try {
+      if (latestUpdate.downloadUrl !== APP_UPDATE_DOWNLOAD_URL) {
+        throw new Error('This update download link is not trusted.');
+      }
+      const result = await AppUpdater.downloadApk({ url: latestUpdate.downloadUrl });
+      const downloadId = Number(result.downloadId);
+      if (!Number.isSafeInteger(downloadId) || downloadId < 1) {
+        throw new Error('The update download could not be started.');
+      }
+      localStorage.setItem('invictusPendingUpdateDownloadId', String(downloadId));
+      localStorage.setItem('invictusPendingUpdateVersion', String(latestUpdate.versionCode));
+      setPendingUpdateDownloadId(downloadId);
+      setUpdateDownloadProgress(0);
+      setUpdateDownloadState('downloading');
+    } catch (error: any) {
+      setUpdateError(error?.message || 'The update could not be downloaded. Check your connection and try again.');
+      setUpdateDownloadState('failed');
+    }
+  };
+
+  const installDownloadedUpdate = async () => {
+    if (!pendingUpdateDownloadId) {
+      setUpdateError('Download the update before installing it.');
+      return;
+    }
+    setUpdateError('');
+    setInstallPermissionMessage('');
+    try {
+      const result = await AppUpdater.installApk({ downloadId: pendingUpdateDownloadId });
+      if (result.permissionRequired) {
+        setInstallPermissionMessage('Android opened the install permission setting. Turn on “Allow from this source,” return here, then tap Install update again.');
+      } else if (result.opened) {
+        setInstallPermissionMessage('Android’s installer is open. Review the update and tap Install. Your saved trips and settings stay on this phone.');
+      }
+    } catch (error: any) {
+      setUpdateError(error?.message || 'Android could not open the installer. Try downloading the update again.');
+    }
   };
 
   const completeWelcomeSetup = (event: React.FormEvent<HTMLFormElement>) => {
@@ -2572,12 +2763,30 @@ export default function App() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-2 flex items-center gap-2 font-bold text-[#102a35]">
+                <RefreshCw className="h-4 w-4 text-teal-700" />
+                App updates
+              </h3>
+              <p className="mb-4 text-sm leading-6 text-slate-500">
+                Check for the latest version. Android will ask you to approve installation.
+              </p>
+              <button
+                type="button"
+                onClick={checkForUpdates}
+                className="brand-gradient-button flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Check for updates
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-bold text-[#102a35]">
                 App Info
               </h3>
 
               <ul className="space-y-3 text-sm text-slate-500">
-                <li>• App: Trip & Petrol Expense Tracker · v1.0.0</li>
+                <li>• App: Trip & Petrol Expense Tracker · v{installedAppInfo.version}</li>
                 <li>• Routing Provider: OSRM Public API</li>
                 <li>• Rate / KM: {formatRupees(petrolRate)} (editable)</li>
                 <li>• Data Storage: Local Device Storage</li>
@@ -2645,6 +2854,137 @@ export default function App() {
         </button>
         </div>
       </nav>
+      )}
+
+      {showUpdateDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="app-update-title"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl"
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-700">Trip &amp; Petrol Expense Tracker</p>
+                <h2 id="app-update-title" className="mt-1 text-xl font-bold text-[#102a35]">App update</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUpdateDialog(false)}
+                aria-label="Close app update"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {updateCheckState === 'checking' && (
+              <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 text-sm font-medium text-teal-900" role="status" aria-live="polite">
+                Checking for the latest version…
+              </div>
+            )}
+
+            {updateCheckState === 'error' && (
+              <div className="space-y-4">
+                <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  {updateError || 'Could not check for updates. Check your internet connection and try again.'}
+                </p>
+                {Capacitor.getPlatform() === 'android' && (
+                  <button
+                    type="button"
+                    onClick={checkForUpdates}
+                    className="brand-gradient-button flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Check again
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(updateCheckState === 'available' || updateCheckState === 'current') && latestUpdate && (
+              <div className="space-y-4">
+                <div className={`rounded-2xl border p-4 ${updateCheckState === 'available' ? 'border-blue-100 bg-blue-50' : 'border-emerald-100 bg-emerald-50'}`}>
+                  <p className={`font-bold ${updateCheckState === 'available' ? 'text-blue-900' : 'text-emerald-900'}`}>
+                    {updateCheckState === 'available' ? 'A new version is available' : 'You’re up to date'}
+                  </p>
+                  <p className={`mt-1 text-sm leading-6 ${updateCheckState === 'available' ? 'text-blue-800' : 'text-emerald-800'}`}>
+                    {updateCheckState === 'available'
+                      ? 'Download it here, then Android will let you review and approve the installation.'
+                      : `You’re using the latest published version, ${installedAppInfo.version}.`}
+                  </p>
+                </div>
+
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <dt className="text-xs text-slate-500">Installed version</dt>
+                    <dd className="mt-1 font-bold text-slate-800">v{installedAppInfo.version}</dd>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <dt className="text-xs text-slate-500">Latest version</dt>
+                    <dd className="mt-1 font-bold text-slate-800">v{latestUpdate.versionName}</dd>
+                  </div>
+                </dl>
+
+                {updateCheckState === 'available' && (
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="text-sm font-bold text-[#102a35]">What’s new</h3>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                      {latestUpdate.whatsNew.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                {updateDownloadState === 'downloading' && (
+                  <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4" role="status" aria-live="polite">
+                    <div className="flex items-center justify-between gap-3 text-sm font-semibold text-teal-900">
+                      <span>Downloading update</span>
+                      <span>{updateDownloadProgress}%</span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                      <div className="h-full rounded-full bg-teal-600 transition-all" style={{ width: `${updateDownloadProgress}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                {updateError && (
+                  <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-900">
+                    {updateError}
+                  </p>
+                )}
+                {installPermissionMessage && (
+                  <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm leading-5 text-blue-900">
+                    {installPermissionMessage}
+                  </p>
+                )}
+
+                {updateCheckState === 'available' && (
+                  <button
+                    type="button"
+                    onClick={updateDownloadState === 'ready' ? installDownloadedUpdate : downloadAvailableUpdate}
+                    disabled={updateDownloadState === 'downloading'}
+                    className="brand-gradient-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {updateDownloadState === 'downloading'
+                      ? 'Downloading…'
+                      : updateDownloadState === 'ready'
+                        ? 'Install update'
+                        : 'Update Now'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowUpdateDialog(false)}
+              className="mt-4 min-h-11 w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+            >
+              Close
+            </button>
+          </section>
+        </div>
       )}
 
       {pendingBackupRestore && (
