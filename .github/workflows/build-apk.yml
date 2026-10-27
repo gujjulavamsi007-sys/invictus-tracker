@@ -38,6 +38,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Generate clean Android icon source layers
+        run: npm run generate:android-icons
+
       - name: Build Web Assets
         run: npm run build
 
@@ -49,6 +52,9 @@ jobs:
 
       - name: Generate Android app icon
         run: npx capacitor-assets generate --android --assetPath assets
+
+      - name: Configure Android adaptive and legacy launcher icons
+        run: node scripts/configure_android_launcher_icons.mjs
 
       - name: Configure Android in-app updater
         run: python3 scripts/configure_android_updater.py
