@@ -1,9 +1,10 @@
 {
-  "versionCode": 39,
-  "versionName": "1.0.39",
+  "versionCode": 41,
+  "versionName": "1.0.41",
   "downloadUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/latest/download/trip-petrol-expense-tracker.apk",
-  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.39",
+  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.41",
   "whatsNew": [
-    "Polish Android launcher icon"
+    "Refresh Android launcher icon with brand gradient",
+    "Refresh Android launcher icon with brand gradient"
   ]
 }
