@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { answerApexQuestion, getApexGenerativeContext, getApexNavigationIntent } from '../src/apexAssistant.mjs';
+import { answerApexQuestion, getApexGenerativeContext, getApexNavigationIntent, normalizeApexQuestion } from '../src/apexAssistant.mjs';
 
 const makeTrip = (overrides = {}) => ({
   id: 1,
@@ -109,7 +109,8 @@ test('handles empty and unsupported questions without inventing trip information
 
   assert.match(empty.text, /no saved trip distances to add up yet/i);
   assert.equal(unsupported.requiresGenerativeAI, true);
-  assert.match(unsupported.fallbackText, /Gemini Nano/i);
+  assert.match(unsupported.fallbackText, /I can help with trip lists/i);
+  assert.doesNotMatch(unsupported.fallbackText, /Gemini Nano|What is the weather/i);
 });
 
 test('answers a PDF capability question directly even with no saved trips', () => {
@@ -149,6 +150,51 @@ test('carries the previous time period into a short follow-up question', () => {
   assert.match(answer.text, /Parking expenses in this month: ₹20/);
 });
 
+test('answers conversational monthly spending wording and carries the intent into a period-only follow-up', () => {
+  const now = new Date(2026, 8, 20);
+  const thisMonth = answerApexQuestion('How much did I spend this month?', sampleTrips, { now });
+  const lastMonth = answerApexQuestion('What about last month?', sampleTrips, {
+    now,
+    history: [
+      { role: 'user', text: 'How much did I spend this month?' },
+      { role: 'assistant', text: thisMonth.text }
+    ]
+  });
+
+  assert.match(thisMonth.text, /this month summary/);
+  assert.match(thisMonth.text, /Total expenses: ₹120/);
+  assert.match(lastMonth.text, /last month summary/);
+  assert.match(lastMonth.text, /Total expenses: ₹30/);
+  assert.equal(lastMonth.requiresGenerativeAI, undefined);
+});
+
+test('normalizes common speech and typing mistakes before matching saved-trip questions', () => {
+  const answer = answerApexQuestion('How much did I spned las mont?', sampleTrips, {
+    now: new Date(2026, 8, 20)
+  });
+
+  assert.equal(normalizeApexQuestion('U dont understand it'), 'you do not understand it');
+  assert.match(answer.text, /last month summary/);
+  assert.match(answer.text, /Total expenses: ₹30/);
+});
+
+test('answers misunderstanding feedback with a clarification instead of sending it to model fallback', () => {
+  const answer = answerApexQuestion('You don’t understand me.', sampleTrips);
+
+  assert.match(answer.text, /Sorry, I missed what you meant/);
+  assert.match(answer.text, /Would you like me to/);
+  assert.equal(answer.requiresGenerativeAI, undefined);
+  assert.doesNotMatch(answer.text, /you don.t understand|Gemini Nano|on-device AI/i);
+});
+
+test('understands the conversational trip-list request', () => {
+  const answer = answerApexQuestion('Show me my trips', sampleTrips);
+
+  assert.equal(getApexNavigationIntent('Show me my trips'), 'trips');
+  assert.equal(getApexNavigationIntent('I want to see my tripps'), 'trips');
+  assert.deepEqual(answer.actions, [{ label: 'Browse trips', tab: 'trips' }]);
+});
+
 test('answers highest-travel day from saved trips instead of returning a generic summary', () => {
   const answer = answerApexQuestion('Which day did I travel the most?', sampleTrips);
 
@@ -166,14 +212,16 @@ test('compares month totals and explains recorded category changes', () => {
   assert.match(answer.text, /Petrol increased by ₹75/);
 });
 
-test('routes unsupported questions to the on-device model with a distinct fallback', () => {
+test('routes unsupported questions to optional on-device AI with a friendly non-repeating fallback', () => {
   const first = answerApexQuestion('How can I cut fuel use?', sampleTrips);
   const second = answerApexQuestion('Is this route efficient?', sampleTrips);
 
   assert.equal(first.requiresGenerativeAI, true);
   assert.equal(second.requiresGenerativeAI, true);
-  assert.match(first.fallbackText, /How can I cut fuel use/);
-  assert.match(second.fallbackText, /Is this route efficient/);
+  assert.match(first.fallbackText, /I can help with trip lists/i);
+  assert.match(second.fallbackText, /I can help with trip lists/i);
+  assert.doesNotMatch(first.fallbackText, /How can I cut fuel use|Gemini Nano/i);
+  assert.doesNotMatch(second.fallbackText, /Is this route efficient|Gemini Nano/i);
 });
 
 test('provides on-device AI with exact saved trip summaries and recent trip details', () => {

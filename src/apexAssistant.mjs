@@ -17,9 +17,106 @@ export const APEX_STARTER_PROMPTS = [
   'Open my reports'
 ];
 
+const APEX_TYPO_FIXES = [
+  [/\b(?:waht|wht|wat)\b/g, 'what'],
+  [/\bur\b/g, 'your'],
+  [/\bu\b/g, 'you'],
+  [/\b(?:pls|plz)\b/g, 'please'],
+  [/\bspned\b/g, 'spend'],
+  [/\bspended\b/g, 'spent'],
+  [/\bspendded\b/g, 'spent'],
+  [/\bexpence(s)?\b/g, match => match.endsWith('s') ? 'expenses' : 'expense'],
+  [/\bexpenss\b/g, 'expense'],
+  [/\blas\b(?=\s+(?:mont|month)\b)/g, 'last'],
+  [/\bmont\b/g, 'month'],
+  [/\bmoth\b/g, 'month'],
+  [/\btrp\b/g, 'trip'],
+  [/\btripps\b/g, 'trips'],
+  [/\bunderstad\b/g, 'understand']
+];
+
+export function normalizeApexQuestion(value) {
+  let text = String(value || '').toLocaleLowerCase('en-IN').replace(/[’‘`]/g, "'");
+  const contractions = [
+    [/\bwhat's\b/g, 'what is'],
+    [/\bwho's\b/g, 'who is'],
+    [/\bwhere's\b/g, 'where is'],
+    [/\bi'm\b/g, 'i am'],
+    [/\bi've\b/g, 'i have'],
+    [/\bi'd\b/g, 'i would'],
+    [/\bi'll\b/g, 'i will'],
+    [/\bdon't\b/g, 'do not'],
+    [/\bdont\b/g, 'do not'],
+    [/\bdidn't\b/g, 'did not'],
+    [/\bdidnt\b/g, 'did not'],
+    [/\bdoesn't\b/g, 'does not'],
+    [/\bdoesnt\b/g, 'does not'],
+    [/\bcan't\b/g, 'can not'],
+    [/\bcant\b/g, 'can not'],
+    [/\bthat's\b/g, 'that is'],
+    [/\bit's\b/g, 'it is']
+  ];
+  for (const [pattern, replacement] of contractions) text = text.replace(pattern, replacement);
+  for (const [pattern, replacement] of APEX_TYPO_FIXES) text = text.replace(pattern, replacement);
+  return text.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function isRepairQuestion(question) {
+  const text = normalizeApexQuestion(question);
+  return /\b(?:you|u) (?:do not|did not) understand(?: me| it| what i mean)?\b|\b(?:you|u) misunderstood(?: me| it)?\b|\bthat is not what i (?:asked|meant)\b|\bnot what i (?:asked|meant)\b|\b(?:that is wrong|that is not right|wrong answer|you got that wrong)\b|\b(?:you|u) do not get what i mean\b/.test(text);
+}
+
+function isPeriodOnlyFollowUp(question) {
+  const text = normalizeApexQuestion(question)
+    .replace(/^(?:and|what about|how about|same for|then|for)\s+/, '');
+  return /^(?:(?:this|last|previous|current|the last|the previous)\s+)?(?:month|week|year|today|yesterday)$/.test(text) ||
+    /^(?:the\s+)?month before$/.test(text);
+}
+
+function getQuestionSubject(question) {
+  const text = normalizeApexQuestion(question);
+  if (/\b(petrol|fuel|gasoline|gas)\b/.test(text)) return 'petrol expenses';
+  if (/\bparking\b/.test(text)) return 'parking expenses';
+  if (/\b(distance|kilomet|kilometer|kilometre|km|travel|travelled|traveled|journey|drive)\b/.test(text)) return 'trip distance';
+  if (/\b(client|visitor|customer)\b/.test(text)) return 'client visits';
+  if (/\b(expense|expenses|spend|spent|cost|amount|paid|money|payment|how much|total|summary|summarize|analyse|analyze|report|breakdown)\b/.test(text)) return 'trip expenses summary';
+  if (/\b(trip|trips|history|journey|visit|visits)\b/.test(text)) return 'trip list';
+  return null;
+}
+
+function getPreviousSubject(history) {
+  for (const message of [...history].reverse()) {
+    if (message?.role !== 'user') continue;
+    const text = normalizeApexQuestion(message.text);
+    if (isPeriodOnlyFollowUp(text)) continue;
+    if (isRepairQuestion(text) || /^(hi|hello|hey|thanks|thank you|how are you)$/.test(text)) return null;
+    return getQuestionSubject(text);
+  }
+  return null;
+}
+
+function getPreviousScopeBounds(history, now) {
+  for (const message of [...history].reverse()) {
+    if (message?.role !== 'user') continue;
+    const text = normalizeApexQuestion(message.text);
+    if (isRepairQuestion(text) || /^(hi|hello|hey|thanks|thank you|how are you)$/.test(text)) return null;
+    const bounds = getDateBounds(text, now);
+    if (bounds) return bounds;
+    if (!getQuestionSubject(text) || !isFollowUpQuestion(text)) return null;
+  }
+  return null;
+}
+
+export function getApexOfflineFallback(question) {
+  if (isRepairQuestion(question)) {
+    return 'Sorry, I missed what you meant. Would you like me to total your expenses, compare months, or show your trips?';
+  }
+  return 'I can help with trip lists, distance, petrol and parking costs, client visits, expense summaries, and reports saved in this tracker. I cannot answer that one from the information available here yet. Could you ask about one of those?';
+}
+
 export function getApexNavigationIntent(question) {
-  const text = String(question || '').toLocaleLowerCase();
-  if (/\b(open|show|view|go to|take me to|navigate to|browse|list)\b/.test(text)) {
+  const text = normalizeApexQuestion(question);
+  if (/\b(open|show|see|view|display|go to|take me to|navigate to|browse|list)\b/.test(text)) {
     if (/\b(report|reports|summary|summaries|analytics|expenses?|expense dashboard)\b/.test(text)) return 'reports';
     if (/\b(trip|trips|history|trip history)\b/.test(text)) return 'trips';
   }
@@ -27,7 +124,7 @@ export function getApexNavigationIntent(question) {
 }
 
 function getDateBounds(question, now) {
-  const text = String(question || '').toLocaleLowerCase();
+  const text = normalizeApexQuestion(question);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (/\b(today|this day)\b/.test(text)) {
     return { from: today, to: today, label: 'today' };
@@ -57,6 +154,13 @@ function getDateBounds(question, now) {
     };
   }
   if (/\b(last month|previous month)\b/.test(text)) {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      to: new Date(now.getFullYear(), now.getMonth(), 0),
+      label: 'last month'
+    };
+  }
+  if (/\bmonth before\b/.test(text)) {
     return {
       from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
       to: new Date(now.getFullYear(), now.getMonth(), 0),
@@ -154,10 +258,10 @@ function getTopVisitor(trips) {
 }
 
 function findRequestedVisitor(question, trips) {
-  const text = String(question || '').toLocaleLowerCase();
+  const text = normalizeApexQuestion(question);
   const visitorNames = [...new Set(trips.map(trip => String(trip.visitor || '').trim()).filter(name => name.length >= 3))]
     .sort((a, b) => b.length - a.length);
-  return visitorNames.find(name => text.includes(name.toLocaleLowerCase())) || null;
+  return visitorNames.find(name => text.includes(normalizeApexQuestion(name))) || null;
 }
 
 function formatTripDate(trip) {
@@ -166,25 +270,24 @@ function formatTripDate(trip) {
 }
 
 function isFollowUpQuestion(question) {
-  const text = String(question || '').toLocaleLowerCase();
-  return /^(and\b|what about\b|how about\b|also\b|same for\b|then\b)/.test(text) ||
+  const text = normalizeApexQuestion(question);
+  return isPeriodOnlyFollowUp(text) || /^(and\b|what about\b|how about\b|also\b|same for\b|then\b)/.test(text) ||
     /\b(what about|how about)\b/.test(text);
 }
 
 function requestGenerativeReply(question) {
-  const questionPreview = String(question || '').slice(0, 180);
   return {
-    text: 'Let me answer that using the current conversation and the saved-trip summary.',
+    text: 'Let me think about that.',
     requiresGenerativeAI: true,
-    fallbackText: `I heard your question: “${questionPreview}”. APEX’s open-ended AI needs Gemini Nano on a supported Android phone; this chat cannot generate that reply without it. I can still calculate trip totals, distance, petrol, parking, frequent clients and routes, and answer questions about reports.`,
+    fallbackText: getApexOfflineFallback(question),
     actions: [{ label: 'Open reports', tab: 'reports' }, { label: 'Browse trips', tab: 'trips' }]
   };
 }
 
 function isSavedTripDataQuestion(question) {
-  const text = String(question || '').toLocaleLowerCase();
-  const mentionsSavedData = /\b(trip|trips|expense|expenses|petrol|fuel|parking|distance|kilomet|km|client|visitor|route|destination|travel|travelled|traveled|spend|spent|cost|amount|report|summary|breakdown)\b/.test(text);
-  const asksForSavedValue = /\b(how much|how many|how far|which|what about|show|list|summar|analy|report|compare|versus|\bvs\b|increase|decrease|higher|lower|recent|latest|most|top|average|count|longest|highest|today|yesterday|this week|last week|this month|last month)\b/.test(text);
+  const text = normalizeApexQuestion(question);
+  const mentionsSavedData = /\b(trip|trips|journey|journeys|expense|expenses|petrol|fuel|gas|parking|distance|kilomet|km|client|visitor|customer|route|destination|travel|travelled|traveled|spend|spent|spending|cost|amount|paid|report|summary|breakdown)\b/.test(text);
+  const asksForSavedValue = /\b(how much|how many|how far|which|what about|what did i|show|see|display|list|summar|analy|report|compare|versus|vs|increase|decrease|higher|lower|recent|latest|most|top|average|count|longest|highest|today|yesterday|this week|last week|this month|last month|spend|spent|paid|cost|total|amount)\b/.test(text);
   const asksForAdviceOrGeneralHelp = /\b(how can|how do i|should i|recommend|suggest|efficient|why is|why did|explain|improve|reduce|cut|save|name|who are you)\b/.test(text);
   const isExactCalculation = /\b(how much|how many|how far|compare|versus|\bvs\b|increase|decrease|higher|lower|spent|spend|total|cost|amount)\b/.test(text);
   return mentionsSavedData && asksForSavedValue && (!asksForAdviceOrGeneralHelp || isExactCalculation);
@@ -192,8 +295,14 @@ function isSavedTripDataQuestion(question) {
 
 export function answerApexQuestion(question, trips = [], options = {}) {
   const rawText = String(question || '').trim();
-  const text = rawText.toLocaleLowerCase();
+  let text = normalizeApexQuestion(rawText);
   const allTrips = Array.isArray(trips) ? trips : [];
+  if (isRepairQuestion(text)) {
+    return {
+      text: 'Sorry, I missed what you meant. Would you like me to total your expenses, compare months, or show your trips?',
+      actions: [{ label: 'Open reports', tab: 'reports' }, { label: 'Browse trips', tab: 'trips' }]
+    };
+  }
   const navigation = getApexNavigationIntent(text);
   if (navigation === 'reports') {
     return {
@@ -225,14 +334,22 @@ export function answerApexQuestion(question, trips = [], options = {}) {
     };
   }
 
-  if (/\b(?:what|waht)\s+(?:is|s)\s+(?:your|ur)\s+name\b|\bwho\s+are\s+you\b|\bwhat should i call you\b/i.test(text)) {
+  if (/\bwhat\s+(?:is|s)\s+(?:your|ur)\s+name\b|\bwho\s+are\s+you\b|\bwhat should i call you\b/i.test(text)) {
     return {
       text: 'I’m APEX, your personal trip and expense assistant. You can call me APEX.',
       actions: []
     };
   }
 
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening)[!.\s]*$/i.test(text)) {
+  if (/^(?:how are you|how are you doing|how is it going)$/.test(text)) {
+    return { text: 'I’m doing well and ready to help with your trips or expenses. What would you like to check?', actions: [] };
+  }
+
+  if (/^(?:thanks|thank you|thank you so much|thx)$/.test(text)) {
+    return { text: 'You’re welcome! Ask me whenever you need help with your trips or expenses.', actions: [] };
+  }
+
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening)$/.test(text)) {
     return {
       text: allTrips.length
         ? 'Hi! I’m APEX. I can help you understand your saved trips and expenses. What would you like to know?'
@@ -243,10 +360,11 @@ export function answerApexQuestion(question, trips = [], options = {}) {
 
   const now = options.now instanceof Date ? options.now : new Date();
   const history = Array.isArray(options.history) ? options.history : [];
-  const inheritedBounds = [...history].reverse()
-    .filter(message => message && message.role === 'user')
-    .map(message => getDateBounds(message.text, now))
-    .find(Boolean);
+  if (isPeriodOnlyFollowUp(text)) {
+    const previousSubject = getPreviousSubject(history);
+    if (previousSubject) text += ' ' + previousSubject;
+  }
+  const inheritedBounds = getPreviousScopeBounds(history, now);
   const bounds = getDateBounds(text, now) || (isFollowUpQuestion(text) ? inheritedBounds : null);
   let selectedTrips = filterByDate(allTrips, bounds);
   let scopeLabel = bounds ? bounds.label : 'all saved trips';
@@ -428,7 +546,7 @@ export function answerApexQuestion(question, trips = [], options = {}) {
     };
   }
 
-  const asksForSummary = /\b(summary|summari[sz]e|analysis|analyze|analyse|report|overall|how much|how many|what (?:are|were) my .*expenses|what did i spend|total)\b/i.test(text);
+  const asksForSummary = /\b(summary|summari[sz]e|analysis|analyze|analyse|report|overall|how much|how many|what (?:are|were) my .*expenses|what did i (?:spend|pay)|what is my (?:spending|total)|my spending|spending|spent|paid|total)\b/i.test(text);
   if (!asksForSummary) return requestGenerativeReply(rawText);
 
   const visitorText = topVisitor
