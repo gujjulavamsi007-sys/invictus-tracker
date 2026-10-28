@@ -333,7 +333,7 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
     const assistantMessage: AssistantMessage = {
       id: replyId,
       role: 'assistant',
-      text: answer.requiresGenerativeAI ? 'Checking for on-device AI…' : answer.text,
+      text: answer.requiresGenerativeAI ? 'Thinking…' : answer.text,
       actions: answer.actions
     };
     setMessages(previous => [...previous, userMessage, assistantMessage]);
@@ -346,7 +346,7 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
     }
     const replaceReply = (text: string, actions = answer.actions) => {
       setMessages(previous => previous.map(message => message.id === replyId ? { ...message, text, actions } : message));
-      const stillWorking = /^(Checking for on-device AI|Thinking on this device|Preparing APEX)/i.test(text);
+      const stillWorking = /^(Thinking|Getting APEX ready)/i.test(text);
       showPetMotion(stillWorking ? 'thinking' : 'ready', stillWorking ? 0 : 1800);
     };
     const fallback = answer.fallbackText || answer.text;
@@ -357,14 +357,14 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
 
     void ApexOnDeviceAi.checkOnDeviceAi().then(async ({ status }) => {
       if (status === 'downloadable') {
-        replaceReply('This phone can run APEX’s AI privately on-device. Its model needs a one-time download; choose Prepare AI when you’re ready.', [
+        replaceReply('APEX can answer broader questions after a one-time setup on this phone. You can still ask about saved trips and expenses right away.', [
           ...(answer.actions || []),
-          { label: 'Prepare AI', command: 'prepare-ai' }
+          { label: 'Set up APEX', command: 'prepare-ai' }
         ]);
         return;
       }
       if (status === 'downloading') {
-        replaceReply('APEX’s on-device AI model is still downloading. Please try your question again when it is ready.');
+        replaceReply('APEX is still getting ready for broader questions. You can ask about saved trips and expenses in the meantime.');
         return;
       }
       if (status !== 'available') {
@@ -372,7 +372,7 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
         return;
       }
 
-      replaceReply('Thinking on this device…', []);
+      replaceReply('Thinking…', []);
       const historyText = conversation.map(message => (message.role === 'user' ? 'You: ' : 'APEX: ') + message.text).join('\n');
       const tripContext = buildTripContext(trips);
       try {
@@ -525,7 +525,7 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
       const replyId = sourceMessageId;
       if (replyId !== undefined) {
         setMessages(previous => previous.map(message => message.id === replyId
-          ? { ...message, text: 'Preparing APEX’s on-device AI… This model is downloaded once to the phone. Keep the app open until it is ready.', actions: [] }
+          ? { ...message, text: 'Getting APEX ready. This is a one-time setup on this phone…', actions: [] }
           : message));
       }
       void ApexOnDeviceAi.prepareOnDeviceAi().then(({ status }) => {
@@ -533,16 +533,16 @@ export default function ApexAssistant({ trips, hidden = false, onNavigate }: Ape
         showPetMotion(status === 'ready' ? 'ready' : status === 'downloading' ? 'thinking' : 'blocked', status === 'downloading' ? 0 : 1800);
         setMessages(previous => previous.map(message => message.id === replyId
           ? { ...message, text: status === 'ready'
-            ? 'APEX’s on-device AI is ready. Please ask your last question again.'
+            ? 'APEX is ready for broader questions. Please ask that again.'
             : status === 'downloading'
-              ? 'APEX’s on-device AI is downloading. Please try again once the download finishes.'
-              : 'This phone cannot run APEX’s on-device AI. You can still ask about trips, expenses, and reports.' }
+              ? 'APEX is still getting ready. You can ask about saved trips and expenses while it finishes.'
+              : 'This phone cannot use the extra APEX setup, but trip totals, expenses, and reports are still available.' }
           : message));
       }).catch(() => {
         if (replyId === undefined) return;
         showPetMotion('blocked', 1800);
         setMessages(previous => previous.map(message => message.id === replyId
-          ? { ...message, text: 'I could not prepare the on-device model. Check the phone’s connection and available storage, then try again.' }
+          ? { ...message, text: 'I could not finish getting APEX ready. You can still ask about saved trips, expenses, and reports.' }
           : message));
       });
       return;
