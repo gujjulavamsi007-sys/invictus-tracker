@@ -1,9 +1,9 @@
 {
-  "versionCode": 45,
-  "versionName": "1.0.45",
+  "versionCode": 47,
+  "versionName": "1.0.47",
   "downloadUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/latest/download/trip-petrol-expense-tracker.apk",
-  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.45",
+  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.47",
   "whatsNew": [
-    "Add APEX on-device assistant"
+    "Improve APEX conversational question handling"
   ]
 }
