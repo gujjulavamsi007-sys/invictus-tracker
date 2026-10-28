@@ -1,10 +1,9 @@
 {
-  "versionCode": 43,
-  "versionName": "1.0.43",
+  "versionCode": 45,
+  "versionName": "1.0.45",
   "downloadUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/latest/download/trip-petrol-expense-tracker.apk",
-  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.43",
+  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.45",
   "whatsNew": [
-    "Force Android to refresh the launcher icon",
-    "Force Android to refresh the launcher icon"
+    "Add APEX on-device assistant"
   ]
 }
