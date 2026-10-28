@@ -49,6 +49,7 @@ import {
   restoreBackupToStorage,
   validateBackup
 } from './reportLogic.mjs';
+import ApexAssistant from './ApexAssistantChat';
 
 type SavedOptionInputProps = {
   value: string;
@@ -159,6 +160,7 @@ export default function App() {
   const [recoveredTripDraft] = useState(() => readTripDraft(localStorage));
   const [showWelcomeSetup, setShowWelcomeSetup] = useState(() => {
     try {
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('apexPreview') === '1') return false;
       if (localStorage.getItem('tripExpenseOnboardingComplete') === 'true') return false;
       const savedTrips = JSON.parse(localStorage.getItem('invictusTrips') || '[]');
       const hasExistingSetup = Boolean(
@@ -2855,6 +2857,15 @@ export default function App() {
         </div>
       </nav>
       )}
+
+      <ApexAssistant
+        trips={trips}
+        hidden={showWelcomeSetup}
+        onNavigate={tab => {
+          setShowReportsMenu(false);
+          setActiveTab(tab);
+        }}
+      />
 
       {showUpdateDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4">
