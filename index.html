@@ -46,6 +46,201 @@
         background-color: #eaf4ef;
         background-image: none;
       }
+      .app-shell.apex-dark-theme { background-color: #030a12 !important; color: #e9f7ff; color-scheme: dark; }
+      .apex-dark-theme[class~="bg-[#eaf4ef]"],
+      .apex-dark-theme [class~="bg-[#eaf4ef]"] { background-color: #030a12 !important; }
+      .apex-dark-theme [class~="bg-white"] { background-color: #0a1a29 !important; }
+      .apex-dark-theme [class~="bg-white/70"] { background-color: rgba(8, 24, 39, 0.86) !important; }
+      .apex-dark-theme [class~="bg-white/80"] { background-color: rgba(8, 24, 39, 0.94) !important; }
+      .apex-dark-theme [class~="bg-white/95"] { background-color: rgba(4, 13, 23, 0.97) !important; }
+      .apex-dark-theme [class~="bg-slate-50"] { background-color: #0c1d2d !important; }
+      .apex-dark-theme [class~="bg-slate-50/80"] { background-color: rgba(12, 29, 45, 0.9) !important; }
+      .apex-dark-theme [class~="bg-slate-100"] { background-color: #12283a !important; }
+      .apex-dark-theme [class~="bg-slate-200"] { background-color: #193348 !important; }
+      .apex-dark-theme [class~="bg-teal-50"],
+      .apex-dark-theme [class~="bg-teal-50/70"] { background-color: rgba(4, 38, 58, 0.82) !important; }
+      .apex-dark-theme [class~="bg-teal-100"] { background-color: #0a3348 !important; }
+      .apex-dark-theme [class~="bg-emerald-50"] { background-color: #09291f !important; }
+      .apex-dark-theme [class~="bg-emerald-100/70"] { background-color: rgba(8, 48, 37, 0.82) !important; }
+      .apex-dark-theme [class~="bg-blue-50"] { background-color: #0b2742 !important; }
+      .apex-dark-theme [class~="bg-amber-50"] { background-color: #322816 !important; }
+      .apex-dark-theme [class~="bg-amber-200/60"] { background-color: rgba(67, 50, 21, 0.72) !important; }
+      .apex-dark-theme [class~="bg-rose-50"] { background-color: #351723 !important; }
+      .apex-dark-theme [class~="bg-rose-100"] { background-color: #4a1d2c !important; }
+      .apex-dark-theme [class~="text-[#102a35]"] { color: #eaf8ff !important; }
+      .apex-dark-theme [class~="text-[#123d53]"],
+      .apex-dark-theme [class~="text-[#32434b]"] { color: #d7edf7 !important; }
+      .apex-dark-theme [class~="text-slate-900"],
+      .apex-dark-theme [class~="text-slate-800"] { color: #e9f7ff !important; }
+      .apex-dark-theme [class~="text-slate-700"] { color: #d1e7f2 !important; }
+      .apex-dark-theme [class~="text-slate-600"] { color: #bed2df !important; }
+      .apex-dark-theme [class~="text-slate-500"] { color: #93acbd !important; }
+      .apex-dark-theme [class~="text-slate-400"] { color: #7793a7 !important; }
+      .apex-dark-theme [class~="text-teal-900"],
+      .apex-dark-theme [class~="text-teal-800"],
+      .apex-dark-theme [class~="text-teal-700"],
+      .apex-dark-theme [class~="text-teal-600"],
+      .apex-dark-theme [class~="text-teal-950"] { color: #69e2ff !important; }
+      .apex-dark-theme [class~="text-emerald-900"],
+      .apex-dark-theme [class~="text-emerald-800"],
+      .apex-dark-theme [class~="text-emerald-700"] { color: #4ee6a3 !important; }
+      .apex-dark-theme [class~="text-blue-900"],
+      .apex-dark-theme [class~="text-blue-800"] { color: #9bd9ff !important; }
+      .apex-dark-theme [class~="text-amber-900"] { color: #ffd98a !important; }
+      .apex-dark-theme [class~="text-rose-700"] { color: #ff9db5 !important; }
+      .apex-dark-theme [class~="border-slate-100"],
+      .apex-dark-theme [class~="border-slate-200"],
+      .apex-dark-theme [class~="border-slate-300"] { border-color: rgba(137, 180, 207, 0.17) !important; }
+      .apex-dark-theme [class~="border-teal-100"],
+      .apex-dark-theme [class~="border-teal-200"],
+      .apex-dark-theme [class~="border-emerald-100"],
+      .apex-dark-theme [class~="border-blue-100"],
+      .apex-dark-theme [class~="border-amber-200"] { border-color: rgba(67, 205, 238, 0.24) !important; }
+      .apex-dark-theme input,
+      .apex-dark-theme textarea,
+      .apex-dark-theme select { color-scheme: dark; }
+      .apex-dark-theme .brand-gradient-bg { background: linear-gradient(135deg, #061425 0%, #082b4b 58%, #07536a 100%); }
+      .apex-dark-theme .brand-gradient-button { background: linear-gradient(110deg, #087be8 0%, #08a8cc 58%, #13a57d 100%); }
+      .apex-dark-theme .brand-gradient-button:hover { filter: brightness(1.1) saturate(1.08); }
+      @keyframes apex-robot-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+      }
+      .apex-robot-float { animation: apex-robot-float 2.6s ease-in-out infinite; }
+      @keyframes apex-mini-hover {
+        0%, 100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+        42% { transform: translate3d(0, -5px, 0) rotate(1deg); }
+        72% { transform: translate3d(0, -2px, 0) rotate(-0.5deg); }
+      }
+      @keyframes apex-mini-excited {
+        0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+        28% { transform: translate3d(0, -10px, 0) rotate(-4deg) scale(1.04); }
+        55% { transform: translate3d(0, 1px, 0) rotate(4deg) scale(0.98); }
+        78% { transform: translate3d(0, -5px, 0) rotate(-2deg) scale(1.02); }
+      }
+      @keyframes apex-mini-thinking {
+        0%, 100% { transform: translate3d(0, -1px, 0) rotate(-3deg); }
+        50% { transform: translate3d(1px, -3px, 0) rotate(5deg); }
+      }
+      @keyframes apex-mini-listen {
+        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+        50% { transform: translate3d(0, -2px, 0) scale(1.035); }
+      }
+      @keyframes apex-mini-drag {
+        0%, 100% { transform: rotate(0deg) scale(0.96); }
+        50% { transform: rotate(-7deg) scale(0.94); }
+      }
+      @keyframes apex-mini-droop {
+        0%, 100% { transform: translate3d(0, 1px, 0) rotate(4deg); }
+        50% { transform: translate3d(0, 3px, 0) rotate(7deg); }
+      }
+      @keyframes apex-mini-wave {
+        0%, 100% { transform: rotate(0deg); }
+        24% { transform: rotate(-24deg); }
+        46% { transform: rotate(13deg); }
+        66% { transform: rotate(-18deg); }
+        82% { transform: rotate(7deg); }
+      }
+      @keyframes apex-mini-blink {
+        0%, 91%, 96%, 100% { transform: scaleY(1); }
+        93%, 95% { transform: scaleY(0.12); }
+      }
+      @keyframes apex-mini-talk {
+        0%, 100% { transform: scaleY(0.76); }
+        50% { transform: scaleY(1.16); }
+      }
+      @keyframes apex-mini-audio {
+        0%, 100% { transform: scaleY(0.42); opacity: 0.7; }
+        50% { transform: scaleY(1.15); opacity: 1; }
+      }
+      @keyframes apex-mini-loading {
+        0%, 75%, 100% { opacity: 0.36; transform: translateY(1px) scale(0.78); }
+        35% { opacity: 1; transform: translateY(-1px) scale(1.14); }
+      }
+      @keyframes apex-mini-sleep {
+        0%, 100% { transform: translateY(1px) rotate(3deg); filter: drop-shadow(0 0 2px rgba(180, 249, 255, 0.72)) drop-shadow(0 0 8px rgba(34, 211, 238, 0.58)) drop-shadow(0 0 17px rgba(14, 165, 233, 0.28)); }
+        50% { transform: translateY(3px) rotate(4deg); filter: drop-shadow(0 0 4px rgba(180, 249, 255, 0.9)) drop-shadow(0 0 12px rgba(34, 211, 238, 0.78)) drop-shadow(0 0 23px rgba(14, 165, 233, 0.42)); }
+      }
+      @keyframes apex-mini-arm-raise {
+        0%, 100% { transform: rotate(0deg); }
+        36%, 76% { transform: rotate(66deg); }
+        56% { transform: rotate(75deg); }
+      }
+      @keyframes apex-mini-arm-raise-right {
+        0%, 100% { transform: rotate(0deg); }
+        36%, 76% { transform: rotate(-66deg); }
+        56% { transform: rotate(-75deg); }
+      }
+      @keyframes apex-mini-look {
+        0%, 100% { transform: translateX(0); }
+        40% { transform: translateX(-2px); }
+        72% { transform: translateX(1px); }
+      }
+      .apex-mini-robot { transform-origin: center bottom; filter: drop-shadow(0 0 2px rgba(196, 251, 255, 0.92)) drop-shadow(0 0 8px rgba(34, 211, 238, 0.82)) drop-shadow(0 0 19px rgba(14, 165, 233, 0.58)); animation: apex-mini-hover 2.15s ease-in-out infinite; }
+      .apex-mini-wave { display: none; transform-box: view-box; transform-origin: 57px 60px; animation: none; }
+      .apex-mini-rest-arm { display: inline; transform-box: view-box; transform-origin: 55px 58px; }
+      .apex-mini-eyes-normal { transform-box: fill-box; transform-origin: center; animation: apex-mini-blink 4.2s ease-in-out infinite; }
+      .apex-mini-eyes-thinking, .apex-mini-eyes-victory, .apex-mini-eyes-sleep,
+      .apex-mini-mouth-open, .apex-mini-mouth-think, .apex-mini-mouth-frown,
+      .apex-mini-mouth-audio, .apex-mini-loading { display: none; }
+      .apex-mini-audio-bar { transform-box: view-box; transform-origin: center; animation: apex-mini-audio 0.48s ease-in-out infinite; }
+      .apex-mini-audio-bar:nth-child(2) { animation-delay: -0.18s; }
+      .apex-mini-audio-bar:nth-child(3) { animation-delay: -0.33s; }
+      .apex-mini-audio-bar:nth-child(4) { animation-delay: -0.11s; }
+      .apex-mini-audio-bar:nth-child(5) { animation-delay: -0.27s; }
+      .apex-mini-loading-dot { animation: apex-mini-loading 0.9s ease-in-out infinite; }
+      .apex-mini-loading-dot-two { animation-delay: 0.15s; }
+      .apex-mini-loading-dot-three { animation-delay: 0.3s; }
+      .apex-mini-robot[data-mood="happy"], .apex-mini-robot[data-mood="ready"] { animation: apex-mini-excited 0.72s ease-in-out 2; }
+      .apex-mini-robot[data-mood="happy"] .apex-mini-wave,
+      .apex-mini-robot[data-mood="dragging"] .apex-mini-wave { display: inline; animation: apex-mini-wave 0.9s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="happy"] .apex-mini-rest-arm,
+      .apex-mini-robot[data-mood="dragging"] .apex-mini-rest-arm { display: none; }
+      .apex-mini-robot[data-mood="dragging"] { animation: apex-mini-drag 0.28s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="dragging"] .apex-mini-wave { animation-duration: 0.34s; }
+      .apex-mini-robot[data-mood="listening"] { animation: apex-mini-listen 0.92s ease-in-out infinite; filter: drop-shadow(0 0 3px rgba(221, 252, 255, 0.98)) drop-shadow(0 0 12px rgba(34, 211, 238, 0.95)) drop-shadow(0 0 26px rgba(14, 165, 233, 0.72)); }
+      .apex-mini-robot[data-mood="listening"] .apex-mini-mouth-open,
+      .apex-mini-robot[data-mood="speaking"] .apex-mini-mouth-open { display: inline; }
+      .apex-mini-robot[data-mood="listening"] .apex-mini-mouth-smile,
+      .apex-mini-robot[data-mood="speaking"] .apex-mini-mouth-smile,
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-mouth-smile,
+      .apex-mini-robot[data-mood="blocked"] .apex-mini-mouth-smile { display: none; }
+      .apex-mini-robot[data-mood="speaking"] .apex-mini-mouth-open { display: none; }
+      .apex-mini-robot[data-mood="speaking"] .apex-mini-mouth-audio { display: inline; }
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-eyes-normal,
+      .apex-mini-robot[data-mood="ready"] .apex-mini-eyes-normal,
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-eyes-normal { display: none; }
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-eyes-thinking,
+      .apex-mini-robot[data-mood="ready"] .apex-mini-eyes-victory,
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-eyes-sleep { display: inline; }
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-loading { display: inline; }
+      .apex-mini-robot[data-mood="ready"] .apex-mini-left-arm { transform-box: view-box; transform-origin: 25px 58px; animation: apex-mini-arm-raise 0.72s ease-in-out 2; }
+      .apex-mini-robot[data-mood="ready"] .apex-mini-rest-arm { animation: apex-mini-arm-raise-right 0.72s ease-in-out 2; }
+      .apex-mini-robot[data-mood="thinking"] { animation: apex-mini-thinking 1.45s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-eyes-thinking { transform-box: fill-box; transform-origin: center; animation: apex-mini-look 1.35s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="thinking"] .apex-mini-mouth-think { display: inline; }
+      .apex-mini-robot[data-mood="sleep"] { animation: apex-mini-sleep 3.8s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-face-screen { opacity: 0.66; }
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-mouth-smile { display: none; }
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-mouth-think { display: inline; opacity: 0.65; }
+      .apex-mini-robot[data-mood="sleep"] .apex-mini-rest-arm { opacity: 0.72; }
+      .apex-mini-robot[data-mood="blocked"] { animation: apex-mini-droop 1.2s ease-in-out infinite; }
+      .apex-mini-robot[data-mood="blocked"] .apex-mini-mouth-frown { display: inline; }
+      @keyframes apex-listening-ring {
+        0% { opacity: 0.7; transform: scale(0.82); }
+        100% { opacity: 0; transform: scale(1.42); }
+      }
+      @keyframes apex-voice-wave {
+        0%, 100% { transform: scaleY(0.38); opacity: 0.68; }
+        50% { transform: scaleY(1); opacity: 1; }
+      }
+      .apex-listening-ring { animation: apex-listening-ring 1.8s ease-out infinite; }
+      .apex-listening-ring-delayed { animation-delay: 0.8s; }
+      .apex-voice-wave { display: flex; height: 30px; align-items: center; justify-content: center; }
+      .apex-voice-wave-bar { width: 3px; border-radius: 9999px; background: linear-gradient(180deg, #a5f3fc, #06b6d4 70%, #2563eb); transform-origin: center; animation: apex-voice-wave 0.8s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .apex-robot-float, .apex-mini-robot, .apex-mini-wave, .apex-mini-eyes-normal, .apex-mini-eyes-thinking, .apex-mini-eyes-victory, .apex-mini-eyes-sleep, .apex-mini-mouth-open, .apex-mini-audio-bar, .apex-mini-loading-dot, .apex-mini-left-arm, .apex-mini-rest-arm, .apex-listening-ring, .apex-voice-wave-bar { animation: none; }
+      }
       .app-header { padding-top: env(safe-area-inset-top, 0px); }
       .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
       @keyframes home-road-ride {

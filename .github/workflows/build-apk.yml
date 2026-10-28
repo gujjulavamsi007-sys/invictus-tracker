@@ -56,7 +56,7 @@ jobs:
       - name: Configure Android adaptive and legacy launcher icons
         run: node scripts/configure_android_launcher_icons.mjs
 
-      - name: Configure Android in-app updater
+      - name: Configure Android app plugins
         run: python3 scripts/configure_android_updater.py
 
       - name: Add GPS Permissions
