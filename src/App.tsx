@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import {
   MapPin,
   Clock,
@@ -21,7 +21,8 @@ import {
   Database,
   UserRound,
   UsersRound,
-  Heart
+  Heart,
+  Map as MapIcon
 } from 'lucide-react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -152,6 +153,7 @@ type AppUpdaterPlugin = {
 };
 
 const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
+const MapScreen = lazy(() => import('./maps/MapScreen'));
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('tracker');
@@ -1319,6 +1321,13 @@ export default function App() {
   };
 
   const createBackup = async () => {
+    let savedMapClients: unknown[] = [];
+    try {
+      const savedClientsValue = JSON.parse(localStorage.getItem('invictusMapClients') || '[]');
+      if (Array.isArray(savedClientsValue)) savedMapClients = savedClientsValue;
+    } catch {
+      // Preserve the existing backup flow if a map-client entry is unreadable.
+    }
     const backup = {
       appId: 'petrol-expenses-tracker',
       formatVersion: 1,
@@ -1329,6 +1338,7 @@ export default function App() {
         savedDestinations,
         managers: assignedPeople,
         savedVisitors,
+        savedMapClients,
         petrolRate
       }
     };
@@ -1562,7 +1572,12 @@ export default function App() {
         </header>
       )}
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5">
+      <main className={activeTab === 'map' ? 'relative min-h-0 flex-1 overflow-hidden p-0' : 'min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5'}>
+        {activeTab === 'map' && (
+          <Suspense fallback={<div className="grid h-full place-items-center bg-[#eaf4ef] text-sm font-semibold text-slate-600">Opening map…</div>}>
+            <MapScreen getCurrentLocation={getGPSLocation} officeLocation={officeLocation} trips={trips} />
+          </Suspense>
+        )}
         {activeTab === 'tracker' && (
           <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-start gap-4 pb-5">
             {showRecoveredTripNotice && (
@@ -2806,7 +2821,7 @@ export default function App() {
 
       {!showWelcomeSetup && (
       <nav className="pb-safe z-20 shrink-0 border-t border-slate-200 bg-white/95 px-3 pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
-        <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-1">
+        <div className="mx-auto grid w-full max-w-xl grid-cols-5 gap-1">
         <button
           onClick={() => setActiveTab('tracker')}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-3 transition ${
@@ -2829,6 +2844,19 @@ export default function App() {
         >
           <History className="h-5 w-5" />
           <span className="text-[10px] font-semibold">Trips</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('map')}
+          aria-current={activeTab === 'map' ? 'page' : undefined}
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 transition ${
+            activeTab === 'map'
+              ? 'bg-teal-50 text-teal-800'
+              : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+          }`}
+        >
+          <MapIcon className="h-5 w-5" />
+          <span className="text-[10px] font-semibold">Map</span>
         </button>
 
         <button
@@ -2860,7 +2888,7 @@ export default function App() {
 
       <ApexAssistant
         trips={trips}
-        hidden={showWelcomeSetup}
+        hidden={showWelcomeSetup || activeTab === 'map'}
         onNavigate={tab => {
           setShowReportsMenu(false);
           setActiveTab(tab);
@@ -3033,6 +3061,9 @@ export default function App() {
                 <dt className="text-xs text-slate-500">Saved lists</dt>
                 <dd className="mt-1 font-bold text-slate-800">
                   {pendingBackupRestore.summary.destinationCount} destinations · {pendingBackupRestore.summary.managerCount} people · {pendingBackupRestore.summary.visitorCount} clients
+                  <span className="mt-1 block text-xs font-medium text-slate-500">
+                    {pendingBackupRestore.summary.mapClientCount || 0} saved map locations
+                  </span>
                 </dd>
               </div>
             </dl>
