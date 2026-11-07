@@ -11,6 +11,7 @@ import {
   persistTripDraft,
   readTripDraft,
   restoreBackupToStorage,
+  MAP_CLIENTS_STORAGE_KEY,
   TRIP_DRAFT_STORAGE_KEY,
   validateBackup
 } from '../src/reportLogic.mjs';
@@ -150,6 +151,33 @@ test('restoring a validated backup writes the expected local settings', () => {
   assert.equal(JSON.parse(storage.getItem('invictusTrips')).length, 1);
   assert.equal(storage.getItem('invictusRate'), '5');
   assert.deepEqual(JSON.parse(storage.getItem('invictusDests')), ['Office', 'Client site']);
+});
+
+test('map client locations are validated and restored while older backups preserve current map clients', () => {
+  const client = {
+    id: 'client-1', name: 'Client A', business: 'Firm A', address: 'Hyderabad',
+    lat: 17.4, lon: 78.4, notes: 'Near the office'
+  };
+  const backup = makeBackup();
+  backup.data.savedMapClients = [client];
+  assert.equal(validateBackup(backup).ok, true);
+  const values = new Map([[MAP_CLIENTS_STORAGE_KEY, '[{"id":"existing"}]']]);
+  const storage = {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: key => values.delete(key)
+  };
+
+  restoreBackupToStorage(storage, backup.data);
+  assert.deepEqual(JSON.parse(storage.getItem(MAP_CLIENTS_STORAGE_KEY)), [client]);
+
+  const olderData = { ...makeBackup().data };
+  restoreBackupToStorage(storage, olderData);
+  assert.deepEqual(JSON.parse(storage.getItem(MAP_CLIENTS_STORAGE_KEY)), [client]);
+
+  const invalidBackup = makeBackup();
+  invalidBackup.data.savedMapClients = [{ ...client, lat: 100 }];
+  assert.equal(validateBackup(invalidBackup).ok, false);
 });
 
 test('a storage failure rolls back values written before backup restore failed', () => {

@@ -1,5 +1,6 @@
 export const TRIP_DRAFT_STORAGE_KEY = 'invictusTripDraft';
 export const PDF_TABLE_HEADER_ROWS = 0;
+export const MAP_CLIENTS_STORAGE_KEY = 'invictusMapClients';
 
 export const createEmptyTrip = () => ({
   startCoords: null,
@@ -227,7 +228,17 @@ export function validateBackup(backup) {
       (typeof trip[field] === 'number' && Number.isFinite(trip[field]))
     )
   );
-  if (!Number.isFinite(validRate) || validRate < 0 || !validOffice || !validTrips) {
+  const validMapClients = data.savedMapClients === undefined || (
+    Array.isArray(data.savedMapClients) && data.savedMapClients.every(client =>
+      client && typeof client === 'object' && typeof client.name === 'string' && client.name.trim() !== '' &&
+      typeof client.lat === 'number' && Number.isFinite(client.lat) && client.lat >= -90 && client.lat <= 90 &&
+      typeof client.lon === 'number' && Number.isFinite(client.lon) && client.lon >= -180 && client.lon <= 180 &&
+      ['business', 'address', 'notes', 'id', 'createdAt', 'updatedAt'].every(field =>
+        client[field] === undefined || client[field] === null || typeof client[field] === 'string'
+      )
+    )
+  );
+  if (!Number.isFinite(validRate) || validRate < 0 || !validOffice || !validTrips || !validMapClients) {
     return { ok: false, error: 'The backup contains invalid trip or setting data.' };
   }
 
@@ -242,7 +253,8 @@ export function validateBackup(backup) {
       officeLocationSaved: Boolean(data.officeLocation),
       destinationCount: data.savedDestinations.length,
       managerCount: data.managers.length,
-      visitorCount: data.savedVisitors.length
+      visitorCount: data.savedVisitors.length,
+      mapClientCount: Array.isArray(data.savedMapClients) ? data.savedMapClients.length : 0
     }
   };
 }
@@ -254,7 +266,10 @@ export function restoreBackupToStorage(storage, data) {
     invictusDests: JSON.stringify(data.savedDestinations),
     invictusManagers: JSON.stringify(data.managers),
     invictusVisitors: JSON.stringify(data.savedVisitors),
-    invictusRate: String(Number(data.petrolRate))
+    invictusRate: String(Number(data.petrolRate)),
+    ...(Array.isArray(data.savedMapClients)
+      ? { [MAP_CLIENTS_STORAGE_KEY]: JSON.stringify(data.savedMapClients) }
+      : {})
   };
   const previousValues = new Map(Object.keys(restoredValues).map(key => [key, storage.getItem(key)]));
   try {
