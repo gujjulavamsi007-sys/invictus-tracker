@@ -1,9 +1,9 @@
 {
-  "versionCode": 47,
-  "versionName": "1.0.47",
+  "versionCode": 50,
+  "versionName": "1.0.50",
   "downloadUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/latest/download/trip-petrol-expense-tracker.apk",
-  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.47",
+  "releaseUrl": "https://github.com/gujjulavamsi007-sys/invictus-tracker/releases/tag/v1.0.50",
   "whatsNew": [
-    "Improve APEX conversational question handling"
+    "Add interactive map and local client manager"
   ]
 }
