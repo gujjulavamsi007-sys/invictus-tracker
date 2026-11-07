@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 36008)
-Total output lines: 3106
-
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import {
   MapPin,
@@ -1546,7 +1543,442 @@ export default function App() {
               <button
                 type="button"
                 onClick={skipWelcomeSetup}
-                className="mt-2 min-h-10 w-full rounded-xl px-4 py-2 text-xs font-semibold text-slate-…6008 tokens truncated…-[540px] w-full text-left text-[11px]">
+                className="mt-2 min-h-10 w-full rounded-xl px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-white"
+              >
+                Set this up later
+              </button>
+              <p className="mt-1 text-center text-[10px] leading-4 text-slate-400">
+                Your name and rate are saved on this phone. Change them anytime in Settings.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+      {activeTab === 'settings' && (
+        <header className="app-header z-10 shrink-0 brand-gradient-bg text-white shadow-sm">
+          <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-5 py-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+              <Navigation className="h-5 w-5 text-teal-300" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-300">
+                {recordedByName || 'PERSONAL TRIP TRACKER'}
+              </p>
+              <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                Trip & Petrol Expense Tracker
+              </h1>
+            </div>
+          </div>
+        </header>
+      )}
+
+      <main className={activeTab === 'map' ? 'relative min-h-0 flex-1 overflow-hidden p-0' : 'min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-5'}>
+        {activeTab === 'map' && (
+          <Suspense fallback={<div className="grid h-full place-items-center bg-[#eaf4ef] text-sm font-semibold text-slate-600">Opening map…</div>}>
+            <MapScreen getCurrentLocation={getGPSLocation} officeLocation={officeLocation} trips={trips} />
+          </Suspense>
+        )}
+        {activeTab === 'tracker' && (
+          <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-start gap-4 pb-5">
+            {showRecoveredTripNotice && (
+              <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+                <p>Your unfinished trip was recovered on this device. You can continue tracking or finish entering its details.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowRecoveredTripNotice(false)}
+                  className="shrink-0 text-xs font-semibold text-teal-800 underline underline-offset-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            {tripState === 'idle' && (
+              <>
+                <header className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] brand-gradient-bg text-white shadow-sm">
+                      <Navigation className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h1 className="max-w-[245px] text-[13px] font-extrabold leading-4 tracking-tight text-[#102a35]">
+                        Trip &amp; Petrol Expense Tracker
+                      </h1>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Trips, made simple</p>
+                    </div>
+                  </div>
+                </header>
+
+                <section aria-labelledby="dashboard-title" className="pt-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-teal-700">{todayLabel}</p>
+                  <h2 id="dashboard-title" className="mt-1 text-[21px] font-extrabold tracking-tight text-[#102a35]">
+                    Ready for your next trip?
+                  </h2>
+                  <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                    Hello,
+                    <span className="inline-flex rounded-full border border-teal-200 bg-white px-2 py-0.5 font-bold text-teal-800 shadow-sm">
+                      {greetingName}
+                    </span>
+                    . Start tracking when you set off.
+                  </p>
+                </section>
+
+                <section className="rounded-[22px] brand-gradient-bg p-4 text-white shadow-lg shadow-slate-900/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/10">
+                      <MapPin className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold">Trip tracking is ready</p>
+                      <p className="mt-0.5 text-[10px] leading-4 text-white/75">GPS will capture your route while you travel.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleStartTrip}
+                    className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-teal-800 shadow-sm transition hover:bg-teal-50 focus:outline-none focus:ring-4 focus:ring-white/30 active:scale-[0.99]"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Start trip
+                  </button>
+                </section>
+
+                <section aria-labelledby="today-summary-title">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <h3 id="today-summary-title" className="text-sm font-bold text-[#102a35]">Today at a glance</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Trips</p>
+                      <p className="mt-1 text-lg font-extrabold tabular-nums text-[#123d53]">{todayTrips.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Distance</p>
+                      <p className="mt-1 whitespace-nowrap text-lg font-extrabold tabular-nums text-[#123d53]">{todayKm.toFixed(1)} <span className="text-[10px] font-semibold">km</span></p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Expenses</p>
+                      <p className="mt-1 whitespace-nowrap text-lg font-extrabold tabular-nums text-[#123d53]">{formatRupees(todayTotal)}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  aria-label="Animated road illustration"
+                  className="relative flex min-h-[230px] flex-1 flex-col overflow-hidden rounded-[22px] border border-white/80 bg-gradient-to-br from-[#f9fffc] via-[#eaf7f2] to-[#e8f1fa] p-4 shadow-sm"
+                >
+                  <div className="relative z-10 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">A little road moment</p>
+                      <h3 className="mt-1 text-sm font-bold text-[#123d53]">Drive safe, travel smart</h3>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-2 flex min-h-[145px] flex-1 items-center overflow-hidden rounded-2xl" aria-hidden="true">
+                    <div className="absolute -right-6 top-1 h-20 w-20 rounded-full bg-amber-200/60 blur-[1px]" />
+                    <div className="absolute left-8 top-5 h-3 w-10 rounded-full bg-white/80 shadow-[12px_4px_0_-1px_rgba(255,255,255,0.65)]" />
+                    <div className="absolute bottom-0 left-0 right-0 h-10 rounded-t-[50%] bg-emerald-100/70" />
+                    <div className="absolute inset-x-3 top-1/2 h-10 -translate-y-1/2 rounded-full bg-[#31576a] shadow-inner" />
+                    <div className="absolute inset-x-5 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-white/80" />
+                    <div className="absolute left-[6%] top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow ring-2 ring-teal-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
+                    </div>
+                    <div className="absolute right-[6%] top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow ring-2 ring-blue-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                    </div>
+                    <div className="home-road-bike absolute left-[8%] top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-1.5 text-teal-800 shadow-md ring-1 ring-teal-100">
+                      <svg viewBox="0 0 52 40" className="h-8 w-10" fill="none">
+                        <circle cx="10" cy="29" r="6" fill="#123d53" />
+                        <circle cx="10" cy="29" r="2.5" fill="#d9f4ec" />
+                        <circle cx="42" cy="29" r="6" fill="#123d53" />
+                        <circle cx="42" cy="29" r="2.5" fill="#d9f4ec" />
+                        <path d="m10 29 12-1 8-10 6 1 6 10M22 28l-5-10h12l7 11M30 18l3-7h6m-2 0 5-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                        <path d="m17 17 5-4 8 1 4 5-5 5H20l-4-3 1-4Z" fill="currentColor" />
+                        <path d="m23 14 3-5 7 2 4 6-6 1-4-4Z" fill="#0f766e" />
+                        <circle cx="25" cy="5" r="3.2" fill="#f0b77c" />
+                        <path d="m24 8-4 5 7 3 5-3m-10 0-4 5m9-6 7 2" stroke="#123d53" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="relative z-10 mt-2 text-center text-[10px] font-medium text-slate-500">A little motion for the road ahead</p>
+                </section>
+
+              </>
+            )}
+
+            {tripState === 'tracking' && (
+              <div className="space-y-4">
+                <div className="relative overflow-hidden rounded-[28px] brand-gradient-bg p-6 text-white shadow-lg shadow-slate-900/10 sm:p-7">
+                  <div className="absolute right-0 top-0 h-40 w-40 translate-x-12 -translate-y-16 rounded-full bg-teal-400/10 blur-2xl" />
+                  <div className="relative flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                      Trip in progress
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-teal-200 ring-1 ring-white/10">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-teal-300" />
+                      Live
+                    </span>
+                  </div>
+
+                  <div className="relative py-9 text-center">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                      Elapsed time
+                    </p>
+                    <div className="whitespace-nowrap text-5xl font-medium tabular-nums tracking-tight text-white sm:text-6xl">
+                      {formatTime(timer)}
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center justify-center gap-2 rounded-xl bg-white/[0.08] px-4 py-3 text-sm font-medium text-slate-200 ring-1 ring-white/10">
+                    <Navigation className="h-4 w-4 text-teal-300" />
+                    GPS tracking active
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleEndTrip}
+                  className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-rose-600 px-5 py-4 text-base font-bold text-white shadow-lg shadow-rose-900/15 transition hover:bg-rose-700 focus:outline-none focus:ring-4 focus:ring-rose-600/20 active:scale-[0.99]"
+                >
+                  <AlertCircle className="h-5 w-5" />
+                  End trip
+                </button>
+              </div>
+            )}
+
+            {tripState === 'saving' && (
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-6 border-b border-slate-100 pb-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+                    Trip details
+                  </p>
+                  <h2 className="text-xl font-bold tracking-tight text-[#102a35]">
+                    Review & save trip
+                  </h2>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        From Location
+                      </label>
+                      <input
+                        type="text"
+                        value={currentTrip.fromLoc}
+                        onChange={e =>
+                          setCurrentTrip({
+                            ...currentTrip,
+                            fromLoc: e.target.value
+                          })
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        To (Destination)
+                      </label>
+                      <SavedOptionInput
+                        value={currentTrip.toLoc}
+                        onChange={toLoc => setCurrentTrip({ ...currentTrip, toLoc })}
+                        options={savedDestinations}
+                        optionsId="current-trip-destination-options"
+                        optionsLabel="Saved destinations"
+                        fieldLabel="To destination"
+                        placeholder="Search or type..."
+                        inputClassName={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-teal-800">
+                        Road Distance (KM)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={currentTrip.actualKm}
+                        onChange={e =>
+                          setCurrentTrip({
+                            ...currentTrip,
+                            actualKm: parseFloat(e.target.value) || 0
+                          })
+                        }
+                        className="w-full rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-3 text-base font-bold text-teal-800 shadow-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Calculated via OSRM
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        Assigned Person
+                      </label>
+                      <SavedOptionInput
+                        value={currentTrip.assignedBy}
+                        onChange={assignedBy => setCurrentTrip({ ...currentTrip, assignedBy })}
+                        options={assignedPeople}
+                        optionsId="current-trip-assigned-person-options"
+                        optionsLabel="Saved people"
+                        fieldLabel="Assigned person"
+                        placeholder="Select or type..."
+                        inputClassName={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                      Visitor / Client Name
+                    </label>
+                    <SavedOptionInput
+                      placeholder="e.g. Printer Shop, HDFC Bank"
+                      value={currentTrip.visitor}
+                      onChange={visitor => setCurrentTrip({ ...currentTrip, visitor })}
+                      options={getAvailableVisitors()}
+                      optionsId="visitor-name-options"
+                      optionsLabel="Saved visitor names"
+                      fieldLabel="Visitor or client name"
+                      inputClassName={inputClass}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        Purpose / Remarks
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Chq Submitted"
+                        value={currentTrip.purpose}
+                        onChange={e =>
+                          setCurrentTrip({
+                            ...currentTrip,
+                            purpose: e.target.value
+                          })
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        Parking Fees (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={currentTrip.parkingFees}
+                        onChange={e =>
+                          setCurrentTrip({
+                            ...currentTrip,
+                            parkingFees: parseFloat(e.target.value) || 0
+                          })
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 border-t border-slate-100 pt-5">
+                    <button
+                      onClick={() => {
+                        clearTripDraft();
+                        setCurrentTrip(createEmptyTrip());
+                        setTripState('idle');
+                        setShowRecoveredTripNotice(false);
+                      }}
+                      className="min-h-12 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      onClick={finalizeTrip}
+                      className="brand-gradient-button flex min-h-12 flex-[2] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-md transition focus:outline-none focus:ring-4 focus:ring-teal-700/20"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save Record
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(activeTab === 'reports' || activeTab === 'trips') && (
+          <>
+          <div className="mx-auto max-w-md space-y-4 pb-5">
+            {activeTab === 'reports' && (
+              <>
+            <div className="rounded-2xl brand-gradient-bg p-5 text-white shadow-lg shadow-slate-900/10">
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">
+                {selectedMonth ? getMonthLabel(selectedMonth) : 'Overall Summary'}
+              </h3>
+
+              <div className="grid grid-cols-2 gap-2 text-center sm:gap-3">
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="text-2xl font-bold tabular-nums">
+                    {reportTrips.length}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    TOTAL TRIPS
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="text-2xl font-bold tabular-nums">
+                    {reportKm.toFixed(1)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    TOTAL KM
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
+                    {formatRupees(reportPetrol)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    PETROL TOTAL
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white/[0.08] px-2 py-3 ring-1 ring-white/10">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
+                    {formatRupees(reportParking)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-slate-300 sm:text-[10px]">
+                    PARKING TOTAL
+                  </div>
+                </div>
+
+                <div className="col-span-2 rounded-xl bg-teal-400/15 px-2 py-3 ring-1 ring-teal-200/20">
+                  <div className="mt-0.5 text-xl font-bold tabular-nums">
+                    {formatRupees(reportGrandTotal)}
+                  </div>
+                  <div className="mt-1 text-[9px] font-semibold tracking-wide text-teal-100 sm:text-[10px]">
+                    GRAND TOTAL
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="monthly-insights-title">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <div>
+                  <h3 id="monthly-insights-title" className="text-sm font-bold text-[#102a35]">Monthly comparison</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Latest {monthlyInsights.length} months · all trips</p>
+                </div>
+                <History className="h-4 w-4 shrink-0 text-teal-700" />
+              </div>
+              {monthlyInsights.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[540px] w-full text-left text-[11px]">
                     <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                       <tr>
                         <th className="px-3 py-2 font-semibold">Month</th>
